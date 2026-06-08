@@ -179,3 +179,31 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+
+# Environment
+.env
+.env.*
+
+# SQLite database
+*.db
+*.db-shm
+*.db-wal
+
+# Docker
+docker-compose.override.yml
+
+# CasaOS / deployment
+data/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Hevy credentials / API keys
+hevy_config.json
