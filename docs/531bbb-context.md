@@ -35,32 +35,32 @@ Read this file at the start of every task. Do not proceed if it is missing.
 
 ---
 
-## Programme model
+## Program model
 
-### Three tiers
+Programs are program-agnostic. Tiers, wave structure, sets, reps, and percentages are all user-defined per program. There are no hardcoded tier names.
 
-| Tier | Prescribed | Sets/Reps | Weight source |
-|---|---|---|---|
-| **Main** | Yes | Percentage-based + AMRAP top set + optional Jokers | Training max × wave % |
-| **BBB** | Yes | 5 × 10 | Averaged e1RM × BBB % — freely adjustable per session |
-| **Accessory** | No | Free log | Free log |
+### Tiers
 
-### Wave structure (3-week repeating)
+Each program defines its own tiers. A tier has a name (user-defined), a behaviour, and a display order. Four behaviours are supported:
 
-| Week | Main % | BBB % |
-|---|---|---|
-| 1 | 75% | 65% |
-| 2 | 80% | 70% |
-| 3 | 85% + AMRAP | 75% |
+| Behaviour | Description |
+|---|---|
+| `percentage` | Weight = training max or e1RM × percentage from `wave_params` |
+| `fixed` | User sets the weight — app tracks it but does not compute it |
+| `progression` | Fixed weight that auto-increments by a configured amount when rep target is hit |
+| `free` | No prescribed weight or sets — free log only |
 
-- Minimum block length: 8 weeks (~3 full waves).
-- Block is 4 training days per week.
-- A new e1RM from each AMRAP top set automatically anchors the following week's working weights.
+### Wave structure
 
-### Training max vs e1RM
+Wave structure is defined per exercise slot via `wave_params` JSON. There is no assumed number of microcycles or days. Microcycles are numbered and user-labeled — they are not calendar weeks.
 
-- **Training max** — set at block creation, typically 90% of tested 1RM. Used for Main set percentages.
-- **e1RM** — computed live at session time from AMRAP reps. Used for BBB weight. Updated in `e1rm_log` after each session.
+### RPE
+
+All programs derive percentages from RPE. Each exercise slot stores a `target_rpe`. Session log stores both `target_rpe` and `actual_rpe` so drift between intended and actual can be tracked over time. The RPE → percentage lookup table lives in `app_settings`.
+
+### Microcycles
+
+Training cycles are called microcycles, not weeks. They have no fixed length in days. The label is freeform — "Micro 1", "Wave 1", etc.
 
 ---
 
@@ -136,7 +136,7 @@ All weights — planned and actual — must be rounded to the nearest 2.5 kg bef
 
 Foreign keys are enforced (`PRAGMA foreign_keys = ON` in `get_db()`).
 
-### Design layer (programme authoring)
+### Design layer (program authoring)
 
 ```
 programs
@@ -146,10 +146,17 @@ programs
   notes TEXT
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 
+tiers
+  id INTEGER PK
+  program_id INTEGER FK → programs.id
+  name TEXT NOT NULL
+  behaviour TEXT NOT NULL  CHECK IN ('percentage','fixed','progression','free')
+  display_order INTEGER NOT NULL DEFAULT 0
+
 blocks
   id INTEGER PK
   program_id INTEGER FK → programs.id
-  week_number INTEGER NOT NULL
+  cycle_number INTEGER NOT NULL
   label TEXT
 
 days
@@ -161,11 +168,12 @@ days
 exercise_slots
   id INTEGER PK
   day_id INTEGER FK → days.id
-  tier TEXT NOT NULL  CHECK IN ('main','bbb','accessory')
+  tier_id INTEGER FK → tiers.id
   hevy_exercise_id TEXT NOT NULL
   hevy_exercise_name TEXT NOT NULL
   slot_order INTEGER NOT NULL DEFAULT 0
   wave_params TEXT  -- JSON: {"percentages": [...], "bbb_percentages": [...]}
+  target_rpe REAL
 ```
 
 ### Live training layer
@@ -175,7 +183,7 @@ active_blocks
   id INTEGER PK
   program_id INTEGER FK → programs.id
   started_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  current_week INTEGER NOT NULL DEFAULT 1
+  current_cycle INTEGER NOT NULL DEFAULT 1
   current_day INTEGER NOT NULL DEFAULT 1
   status TEXT NOT NULL DEFAULT 'active'  CHECK IN ('active','completed','abandoned')
 
@@ -186,11 +194,12 @@ session_log
   week_number INTEGER NOT NULL
   day_number INTEGER NOT NULL
   set_number INTEGER NOT NULL
-  set_type TEXT NOT NULL  CHECK IN ('main','bbb','joker','accessory')
+  set_type TEXT NOT NULL
   planned_weight_kg REAL   -- rounded to 2.5 kg
   actual_weight_kg REAL    -- rounded to 2.5 kg
   reps INTEGER
-  rpe REAL
+  target_rpe REAL
+  actual_rpe REAL
   hevy_workout_id TEXT
   logged_at DATETIME DEFAULT CURRENT_TIMESTAMP
 

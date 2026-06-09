@@ -20,10 +20,18 @@ def init_db() -> None:
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             );
 
+            CREATE TABLE IF NOT EXISTS tiers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                program_id INTEGER NOT NULL REFERENCES programs(id),
+                name TEXT NOT NULL,
+                behaviour TEXT NOT NULL CHECK(behaviour IN ('percentage','fixed','progression','free')),
+                display_order INTEGER NOT NULL DEFAULT 0
+            );
+
             CREATE TABLE IF NOT EXISTS blocks (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 program_id INTEGER NOT NULL REFERENCES programs(id),
-                week_number INTEGER NOT NULL,
+                cycle_number INTEGER NOT NULL,
                 label TEXT
             );
 
@@ -37,18 +45,19 @@ def init_db() -> None:
             CREATE TABLE IF NOT EXISTS exercise_slots (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 day_id INTEGER NOT NULL REFERENCES days(id),
-                tier TEXT NOT NULL CHECK(tier IN ('main','bbb','accessory')),
+                tier_id INTEGER NOT NULL REFERENCES tiers(id),
                 hevy_exercise_id TEXT NOT NULL,
                 hevy_exercise_name TEXT NOT NULL,
                 slot_order INTEGER NOT NULL DEFAULT 0,
-                wave_params TEXT
+                wave_params TEXT,
+                target_rpe REAL
             );
 
             CREATE TABLE IF NOT EXISTS active_blocks (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 program_id INTEGER NOT NULL REFERENCES programs(id),
                 started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                current_week INTEGER NOT NULL DEFAULT 1,
+                current_cycle INTEGER NOT NULL DEFAULT 1,
                 current_day INTEGER NOT NULL DEFAULT 1,
                 status TEXT NOT NULL DEFAULT 'active'
                     CHECK(status IN ('active','completed','abandoned'))
@@ -61,12 +70,12 @@ def init_db() -> None:
                 week_number INTEGER NOT NULL,
                 day_number INTEGER NOT NULL,
                 set_number INTEGER NOT NULL,
-                set_type TEXT NOT NULL
-                    CHECK(set_type IN ('main','bbb','joker','accessory')),
+                set_type TEXT NOT NULL,
                 planned_weight_kg REAL,
                 actual_weight_kg REAL,
                 reps INTEGER,
-                rpe REAL,
+                target_rpe REAL,
+                actual_rpe REAL,
                 hevy_workout_id TEXT,
                 logged_at DATETIME DEFAULT CURRENT_TIMESTAMP
             );

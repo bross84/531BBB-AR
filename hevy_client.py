@@ -31,7 +31,7 @@ def save_api_key(raw_key: str) -> None:
         )
 
 
-def _load_api_key() -> str | None:
+def get_api_key() -> str | None:
     with get_db() as conn:
         row = conn.execute(
             "SELECT value FROM app_settings WHERE key = ?", (_SETTINGS_KEY,)
@@ -43,7 +43,7 @@ def _load_api_key() -> str | None:
 
 class HevyClient:
     def __init__(self, api_key: str | None = None):
-        self.api_key = api_key or _load_api_key()
+        self.api_key = api_key or get_api_key()
 
     def _headers(self) -> dict:
         if not self.api_key:
