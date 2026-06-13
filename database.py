@@ -1,5 +1,6 @@
-import sqlite3
+import csv
 import os
+import sqlite3
 
 
 def get_db() -> sqlite3.Connection:
@@ -101,4 +102,36 @@ def init_db() -> None:
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS rpe_chart (
+                rpe  REAL NOT NULL,
+                reps INTEGER NOT NULL,
+                percentage REAL NOT NULL,
+                PRIMARY KEY (rpe, reps)
+            );
         """)
+        _seed_rpe_chart(conn)
+
+
+_RPE_CSV = os.path.join(os.path.dirname(__file__), "data", "rpe_chart.csv")
+
+
+def _seed_rpe_chart(conn: sqlite3.Connection) -> None:
+    row = conn.execute("SELECT COUNT(*) FROM rpe_chart").fetchone()
+    if row[0] > 0:
+        return
+    with open(_RPE_CSV, newline="") as f:
+        reader = csv.DictReader(f)
+        conn.executemany(
+            "INSERT INTO rpe_chart (rpe, reps, percentage) VALUES (?, ?, ?)",
+            [(float(r["rpe"]), int(r["reps"]), float(r["percentage"])) for r in reader],
+        )
+
+
+def get_rpe_percentage(rpe: float, reps: int) -> float | None:
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT percentage FROM rpe_chart WHERE rpe = ? AND reps = ?",
+            (rpe, reps),
+        ).fetchone()
+    return float(row["percentage"]) if row else None

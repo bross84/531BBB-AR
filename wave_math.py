@@ -6,6 +6,10 @@ def _round_weight(kg: float) -> float:
     return round(kg / ROUND_TO_KG) * ROUND_TO_KG
 
 
+def round_weight(kg: float) -> float:
+    return _round_weight(kg)
+
+
 def epley(weight_kg: float, reps: int) -> float:
     if reps == 1:
         return weight_kg
@@ -24,6 +28,11 @@ def working_weight(training_max_kg: float, week_number: int, wave_params: dict) 
 def bbb_weight(e1rm_kg: float, week_number: int, wave_params: dict) -> float:
     pct = wave_params["bbb_percentages"][week_number - 1]
     return _round_weight(e1rm_kg * pct)
+
+
+def joker_weight(previous_weight_kg: float, jump_pct: float) -> float:
+    """Compute Joker set weight from previous set weight and jump percentage."""
+    return _round_weight(previous_weight_kg * (1 + jump_pct))
 
 
 def session_e1rm(amrap_e1rm: float, joker_sets: list[tuple[float, float]]) -> float:

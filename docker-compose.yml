@@ -10,7 +10,6 @@ services:
     environment:
       - DB_PATH=/data/531bbb.db
       - HEVY_API_KEY=${HEVY_API_KEY}
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
     x-casaos:
       envs:
         - container: DB_PATH
@@ -19,9 +18,6 @@ services:
         - container: HEVY_API_KEY
           description:
             en_us: Hevy API key
-        - container: ENCRYPTION_KEY
-          description:
-            en_us: Fernet encryption key for secrets stored in the database
 
 volumes:
   531bbb-data:
