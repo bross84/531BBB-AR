@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "531bbb-ar",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "uvicorn", "main:app", "--port", "8126", "--reload"],
+      "port": 8126,
+      "autoPort": false
+    }
+  ]
+}

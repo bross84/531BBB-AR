@@ -115,6 +115,8 @@
     .tabs {
       display: flex;
       gap: 0.45rem;
+      width: 100%;
+      box-sizing: border-box;
       padding: 0.4rem;
       border: 1px solid var(--border);
       border-radius: var(--radius);
@@ -124,6 +126,7 @@
 
     .tab {
       flex: 1;
+      min-height: 44px;
       border: 1px solid transparent;
       border-radius: 10px;
       background: transparent;
@@ -245,6 +248,70 @@
     }
 
     .programs-screen { display: block; }
+
+    .programs-layout {
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      gap: 0.75rem;
+      align-items: start;
+    }
+
+    @media (max-width: 680px) {
+      .programs-layout { grid-template-columns: 1fr; }
+    }
+
+    .programs-panel {
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.75rem;
+    }
+
+    .program-row {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.38rem 0.45rem;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: background 0.1s;
+      margin-bottom: 0.2rem;
+    }
+    .program-row:hover { background: var(--bg-soft); }
+    .program-row.selected { background: rgba(111, 211, 178, 0.12); border-color: var(--accent); }
+    .program-row-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.85rem; }
+
+    .btn-icon {
+      padding: 0.15rem 0.38rem;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      color: var(--muted);
+      border-radius: 4px;
+      font-size: 0.78rem;
+      line-height: 1.4;
+      flex-shrink: 0;
+      transition: color 0.1s, background 0.1s;
+    }
+    .btn-icon:hover { color: var(--error); background: rgba(255,127,127,0.12); }
+
+    .autocomplete-dropdown {
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      border-top: none;
+      border-radius: 0 0 8px 8px;
+      box-shadow: var(--shadow);
+      max-height: 220px;
+      overflow-y: auto;
+      z-index: 20;
+    }
+    .autocomplete-item {
+      padding: 0.38rem 0.65rem;
+      cursor: pointer;
+      font-size: 0.84rem;
+    }
+    .autocomplete-item:hover, .autocomplete-item.ac-focused { background: var(--bg-soft); }
 
     .program-toolbar {
       display: flex;
@@ -592,8 +659,16 @@
 
     @media (max-width: 680px) {
       .view { padding: 0.7rem; }
-      .tab-label, .theme-wrap span { display: none; }
-      .tab { padding: 0.52rem; }
+      .theme-wrap span { display: none; }
+      .tabs {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .tab {
+        width: 100%;
+        min-height: 44px;
+        padding: 0.52rem 0.35rem;
+      }
       .sheet { font-size: 0.75rem; }
       .sheet th, .sheet td { padding: 0.3rem 0.32rem; }
       .micro-row { grid-template-columns: 1fr auto; }
@@ -638,23 +713,28 @@
     .wo-sets-table {
       width: 100%;
       border-collapse: collapse;
+      table-layout: fixed;
       font-size: 0.8rem;
     }
     .wo-sets-table th {
-      font-size: 0.7rem;
+      font-size: 0.73rem;
       color: var(--muted);
       text-transform: uppercase;
       letter-spacing: 0.03em;
       background: var(--bg-mute);
-      padding: 0.28rem 0.42rem;
-      text-align: left;
+      padding: 5px 8px;
+      text-align: center;
+      border-bottom: 1px solid var(--border);
     }
+    .wo-sets-table th:first-child { text-align: left; }
+    .wo-sets-table th:nth-child(2) { text-align: left; }
     .wo-sets-table td {
-      padding: 0.3rem 0.42rem;
+      padding: 5px 8px;
       vertical-align: middle;
+      border-bottom: 1px solid var(--border);
     }
-    .wo-sets-table tr.row-a { background: var(--bg-mute); }
-    .wo-sets-table tr.row-b { background: var(--bg-soft); border-bottom: 1px solid var(--border); }
+    .wo-sets-table tr:last-child td { border-bottom: 0; }
+    .wo-sets-table tr.amrap-row { background: var(--bg-mute); }
     .wo-sets-table input[type=number] {
       -moz-appearance: textfield;
       border: 1px solid var(--border);
@@ -667,6 +747,7 @@
     }
     .wo-sets-table input[type=number]::-webkit-inner-spin-button,
     .wo-sets-table input[type=number]::-webkit-outer-spin-button { display: none; }
+    .wo-joker-row { color: var(--muted); }
     .wo-dimmed { opacity: 0.4; }
     .wo-summary-table {
       width: 100%;
@@ -685,6 +766,20 @@
       letter-spacing: 0.03em;
       background: var(--bg-mute);
     }
+
+    /* ── Workout session card layout ─────────────────────────────────────── */
+    input[type=number] { -moz-appearance: textfield; }
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button { display: none; }
+
+    .wo-set-row { display: grid; grid-template-columns: 28px 1fr 52px 56px 52px 36px; gap: 6px; padding: 9px 12px; border-bottom: 0.5px solid var(--border); align-items: center; }
+    .wo-set-badge { width: 24px; height: 24px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; cursor: pointer; flex-shrink: 0; }
+    .wo-check-btn { width: 32px; height: 32px; border-radius: 8px; border: 0.5px solid var(--border); background: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; color: var(--muted); }
+    .wo-check-btn.done { background: rgba(78,207,125,0.18); border-color: rgba(78,207,125,0.4); color: var(--ok); }
+    .wo-bottom-sheet { background: var(--bg-elev); border-radius: 16px 16px 0 0; padding: 16px; border-top: 0.5px solid var(--border); width: 100%; }
+    .wo-sheet-option { padding: 14px 16px; border-bottom: 0.5px solid var(--border); cursor: pointer; font-size: 15px; display: flex; align-items: center; gap: 12px; }
+    .wo-sheet-option:last-child { border-bottom: none; }
+    .wo-card-input { border: 1px solid var(--border); border-radius: 6px; background: var(--bg-elev); color: var(--text); padding: 2px 4px; }
   </style>
 </head>
 <body>
@@ -706,15 +801,12 @@
 
     <nav class="tabs" aria-label="Main">
       <button class="tab" type="button" data-tab="workout" aria-selected="true">
-        <span class="tab-icon" aria-hidden="true">W</span>
         <span class="tab-label">Workout</span>
       </button>
       <button class="tab" type="button" data-tab="programs" aria-selected="false">
-        <span class="tab-icon" aria-hidden="true">P</span>
         <span class="tab-label">Program</span>
       </button>
       <button class="tab" type="button" data-tab="settings" aria-selected="false">
-        <span class="tab-icon" aria-hidden="true">S</span>
         <span class="tab-label">Settings</span>
       </button>
     </nav>
@@ -762,9 +854,7 @@
       </section>
 
       <section id="view-programs" class="view">
-        <div id="programsScreenList" class="programs-screen"></div>
-        <div id="programsScreenProgram" class="programs-screen hide"></div>
-        <div id="programsScreenDay" class="programs-screen hide"></div>
+        <div id="programsScreen"></div>
         <div id="programsStatus" class="status"></div>
       </section>
 
@@ -785,17 +875,8 @@
       unitPref: "kg",
       programs: [],
       programDetail: null,
-      programsView: "list",
-      creatingProgram: false,
       selectedProgramId: null,
-      selectedCycleId: null,
-      selectedDayId: null,
-      tmEditingSlotId: null,
-      tmBySlotId: {},
-      tmLoadingDayId: null,
-      tmLoadedDayId: null,
-      movementDraft: null,
-      exerciseSearchDebounceId: null,
+      programText: "",
       exercises: [],
       activeBlock: null,
       sessionData: null,
@@ -822,9 +903,7 @@
       unitKgBtn: document.getElementById("unitKgBtn"),
       unitLbsBtn: document.getElementById("unitLbsBtn"),
       unitStatus: document.getElementById("unitStatus"),
-      programsScreenList: document.getElementById("programsScreenList"),
-      programsScreenProgram: document.getElementById("programsScreenProgram"),
-      programsScreenDay: document.getElementById("programsScreenDay"),
+      programsScreen: document.getElementById("programsScreen"),
       programsStatus: document.getElementById("programsStatus"),
       workoutLanding: document.getElementById("workoutLanding"),
       workoutSession: document.getElementById("workoutSession")
@@ -886,7 +965,7 @@
       refs.unitKgBtn.classList.toggle("active", state.unitPref === "kg");
       refs.unitLbsBtn.classList.toggle("active", state.unitPref === "lbs");
       setStatus(refs.unitStatus, `Unit preference saved: ${state.unitPref.toUpperCase()} primary`, "ok");
-      renderProgramsScreens();
+      renderProgramsLayout();
       renderWorkoutSession();
     }
 
@@ -899,6 +978,7 @@
         view.classList.toggle("active", key === tabId);
       });
       if (tabId === "workout") woLoadHome();
+      if (tabId === "programs") renderProgramsLayout();
     }
 
     function applyTheme(theme) {
@@ -937,7 +1017,10 @@
       const body = hasJson ? await response.json() : null;
 
       if (!response.ok) {
-        const detail = body?.detail || `Request failed (${response.status})`;
+        const rawDetail = body?.detail;
+        const detail = Array.isArray(rawDetail)
+          ? rawDetail.map(e => `Line ${e.line}: ${e.message}`).join('\n')
+          : (rawDetail || `Request failed (${response.status})`);
         throw new Error(detail);
       }
       return body;
@@ -1038,7 +1121,7 @@
     async function loadPrograms() {
       const rows = await fetchJson("/programs", { method: "GET" });
       state.programs = Array.isArray(rows) ? rows : [];
-      renderProgramsScreens();
+      renderProgramsLayout();
     }
 
     function parseJsonSafe(raw) {
@@ -1052,756 +1135,430 @@
     }
 
     function normalizeProgramDetail(program) {
-      const rawCycles = Array.isArray(program?.cycles)
-        ? program.cycles
-        : (Array.isArray(program?.blocks) ? program.blocks : []);
+      const normalizeSlot = (slot) => ({
+        ...slot,
+        wave_params: parseJsonSafe(slot.wave_params)
+      });
+      const normalizeDay = (day) => ({
+        ...day,
+        slots: (day.slots || []).map(normalizeSlot)
+      });
+      const normalizeMc = (mc) => ({
+        ...mc,
+        days: (mc.days || []).map(normalizeDay).sort((a, b) => a.day_number - b.day_number)
+      });
+      const normalizeBlock = (blk) => ({
+        ...blk,
+        microcycles: (blk.microcycles || []).map(normalizeMc).sort((a, b) => a.cycle_number - b.cycle_number)
+      });
 
-      const cycles = rawCycles
-        .map((cycle) => ({
-          ...cycle,
-          days: (cycle.days || [])
-            .map((day) => ({
-              ...day,
-              slots: (day.slots || []).map((slot) => ({
-                ...slot,
-                wave_params: parseJsonSafe(slot.wave_params)
-              }))
-            }))
-            .sort((a, b) => a.day_number - b.day_number)
-        }))
-        .sort((a, b) => a.cycle_number - b.cycle_number);
+      const blocks = Array.isArray(program?.blocks)
+        ? program.blocks.map(normalizeBlock).sort((a, b) => a.block_number - b.block_number)
+        : [];
 
       return {
         ...program,
-        cycles,
+        blocks,
         tiers: Array.isArray(program?.tiers) ? program.tiers : []
       };
     }
 
-    function setProgramsView(view) {
-      setStatus(refs.programsStatus, "");
-      state.programsView = view;
-      refs.programsScreenList.classList.toggle("hide", view !== "list");
-      refs.programsScreenProgram.classList.toggle("hide", view !== "program");
-      refs.programsScreenDay.classList.toggle("hide", view !== "day");
-      renderProgramsScreens();
-    }
+    // ── Programs tab — notation reconstruction ────────────────────────────────
 
-    function getSelectedCycle() {
-      const cycles = state.programDetail?.cycles || [];
-      return cycles.find((cycle) => cycle.id === state.selectedCycleId) || null;
-    }
-
-    function getSelectedDay() {
-      const cycle = getSelectedCycle();
-      if (!cycle) return null;
-      return (cycle.days || []).find((day) => day.id === state.selectedDayId) || null;
-    }
-
-    async function getTM(slotId) {
-      const response = await fetch(`/settings/tm/${slotId}`);
-      if (response.status === 404) return null;
-      if (!response.ok) {
-        throw new Error(`TM fetch failed (${response.status})`);
+    function _reconstructSourceTag(sp) {
+      if (!sp || !sp.source || sp.source === "free") return "";
+      if (sp.source === "tm") {
+        const pct = Math.round((sp.wm_pct ?? 0.90) * 100);
+        return ` TM${pct}`;
       }
-      const data = await response.json();
-      const value = Number(data?.value_kg);
-      return Number.isFinite(value) && value > 0 ? value : null;
-    }
-
-    async function saveTM(slotId, valueKg) {
-      const parsed = Number.parseFloat(valueKg);
-      if (!Number.isFinite(parsed) || parsed <= 0) {
-        throw new Error("TM must be a positive number.");
+      if (sp.source === "e1rm") return " e1RM";
+      if (sp.source === "ddp") {
+        const inc = sp.increment_kg ?? 2.5;
+        return inc !== 2.5 ? ` DDP+${inc}` : " DDP";
       }
-      const response = await fetch("/settings/tm", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slot_id: slotId, value_kg: parsed })
-      });
-      if (!response.ok) {
-        const body = response.headers.get("content-type")?.includes("application/json") ? await response.json() : null;
-        throw new Error(body?.detail || `TM save failed (${response.status})`);
-      }
-      const data = await response.json();
-      const value = Number(data?.value_kg);
-      return Number.isFinite(value) && value > 0 ? value : parsed;
+      return "";
     }
 
-    async function preloadDayTMs(day) {
-      if (!day) return;
-      if (state.tmLoadedDayId === day.id) return;
-      if (state.tmLoadingDayId === day.id) return;
-      state.tmLoadingDayId = day.id;
-
-      const slots = [...(day.slots || [])].sort((a, b) => a.slot_order - b.slot_order);
-      try {
-        await Promise.all(
-          slots.map(async (slot) => {
-            const tm = await getTM(slot.id);
-            state.tmBySlotId[slot.id] = tm;
-          })
-        );
-      } catch (error) {
-        setStatus(refs.programsStatus, error.message, "error");
-      } finally {
-        state.tmLoadingDayId = null;
-      }
-
-      state.tmLoadedDayId = day.id;
-
-      const selectedDay = getSelectedDay();
-      if (selectedDay && selectedDay.id === day.id && state.programsView === "day") {
-        renderProgramsScreens();
-      }
-    }
-
-    function summarizeSets(slot) {
-      const wave = parseJsonSafe(slot.wave_params);
-      const rows = Array.isArray(wave.sets) ? wave.sets : [];
-      if (!rows.length) {
-        const legacySets = Number(wave.sets);
-        const legacyReps = Number(wave.reps);
-        if (Number.isFinite(legacySets) && Number.isFinite(legacyReps)) {
-          return `${legacySets} x ${legacyReps}`;
-        }
-        return "-";
-      }
-
-      const reps = rows.map((setRow) => Number(setRow.reps)).filter((value) => Number.isFinite(value) && value > 0);
-      if (!reps.length) return "-";
-      const sameReps = reps.every((value) => value === reps[0]);
-      return sameReps ? `${reps.length} x ${reps[0]}` : reps.join(" / ");
-    }
-
-    async function refreshSelectedProgram() {
-      if (!state.selectedProgramId) return;
-      const detail = await fetchJson(`/programs/${state.selectedProgramId}`, { method: "GET" });
-      state.programDetail = normalizeProgramDetail(detail);
-      state.tmBySlotId = {};
-      state.tmLoadingDayId = null;
-      state.tmLoadedDayId = null;
-      const cycle = getSelectedCycle() || state.programDetail.cycles[0] || null;
-      state.selectedCycleId = cycle ? cycle.id : null;
-      const day = getSelectedDay() || (cycle?.days || [])[0] || null;
-      state.selectedDayId = day ? day.id : null;
-    }
-
-    function renderProgramsListScreen() {
-      refs.programsScreenList.innerHTML = `
-        <div class="program-toolbar">
-          <h2>Programs</h2>
-          <button id="programCreateBtn" class="btn primary" type="button">+ New Program</button>
-        </div>
-        ${state.creatingProgram ? `
-          <div class="panel" style="margin-bottom:0.55rem;">
-            <div class="row" style="margin-top:0;">
-              <div class="field">
-                <label for="newProgramNameInline">Program name</label>
-                <input id="newProgramNameInline" type="text" autocomplete="off" />
-              </div>
-              <button id="programCreateConfirmBtn" class="btn primary" type="button">Create</button>
-              <button id="programCreateCancelBtn" class="btn" type="button">Cancel</button>
-            </div>
-          </div>
-        ` : ""}
-        <div id="programList" class="program-list">
-          ${state.programs.length
-            ? state.programs
-              .map(
-                (program) => `
-                  <div class="program-row" data-open-program="${program.id}" role="button" tabindex="0">
-                    <strong>${escapeHtml(program.name)}</strong>
-                    <span aria-hidden="true">&gt;</span>
-                  </div>
-                `
-              )
-              .join("")
-            : `<div class="fallback">No programs yet</div>`}
-        </div>
-      `;
-    }
-
-    function renderProgramDetailScreen() {
-      if (!state.programDetail) {
-        refs.programsScreenProgram.innerHTML = "";
-        return;
-      }
-
-      const cycles = state.programDetail.cycles || [];
-      refs.programsScreenProgram.innerHTML = `
-        <div class="program-toolbar">
-          <button id="programBackToListBtn" class="btn" type="button">Back</button>
-          <button id="deleteProgramBtn" class="btn" type="button" aria-label="Delete program">&#128465;</button>
-        </div>
-
-        <div class="panel">
-          <input id="programNameInline" class="program-name-inline" value="${escapeAttr(state.programDetail.name)}" />
-        </div>
-
-        <div class="panel">
-          <div class="program-toolbar" style="margin-bottom:0.5rem;">
-            <h2>Microcycles</h2>
-            <button id="addMicrocycleBtn" class="btn" type="button">+ Add Microcycle</button>
-          </div>
-          <div class="micro-list">
-            ${cycles.length
-              ? cycles.map((cycle) => `
-                <div class="micro-row">
-                  <button class="micro-open" type="button" data-open-cycle="${cycle.id}">${escapeHtml(cycle.label || `Micro ${cycle.cycle_number}`)}</button>
-                  <span aria-hidden="true">&gt;</span>
-                  <button class="btn" type="button" data-delete-cycle="${cycle.id}" aria-label="Delete microcycle">&#128465;</button>
-                </div>
-              `).join("")
-              : `<div class="fallback">No microcycles yet</div>`}
-          </div>
-        </div>
-      `;
-    }
-
-    function renderMovementBuilder(day) {
-      if (!state.movementDraft?.open) return "";
-      const draft = state.movementDraft;
-      const results = draft.results || [];
-      const selected = draft.selectedExercise;
-
-      return `
-        <div class="movement-panel">
-          <h3 style="margin:0 0 0.5rem;font-size:0.9rem;">Add Movement</h3>
-          <div class="field">
-            <label for="movementSearchInput">Exercise search</label>
-            <input id="movementSearchInput" class="search-input" type="text" value="${escapeAttr(draft.query || "")}" placeholder="Search exercises" />
-            <div class="search-results" tabindex="-1">
-              ${results.length
-                ? results.map((row) => `
-                  <button class="search-item" type="button" data-select-exercise="${escapeAttr(row.id)}" data-select-exercise-name="${escapeAttr(row.title)}">${escapeHtml(row.title)}</button>
-                `).join("")
-                : (draft.query ? `<div class="hint" style="padding:0.45rem;">No matches</div>` : "")}
-            </div>
-          </div>
-
-          ${selected ? `
-            <div class="hint" style="margin-top:0.45rem;">Selected: ${escapeHtml(selected.title)}</div>
-
-            <table class="set-grid">
-              <thead>
-                <tr>
-                  <th style="width:10%;">Set #</th>
-                  <th style="width:18%;">Reps</th>
-                  <th style="width:16%;">RPE</th>
-                  <th style="width:16%;">AMRAP</th>
-                  <th style="width:16%;">Joker</th>
-                  <th style="width:24%;"></th>
-                </tr>
-              </thead>
-              <tbody>
-                ${draft.sets.map((setRow, index) => {
-                  const jokerCount = draft.sets.slice(0, index).filter(s => s.is_joker).length;
-                  const defaultJumpPct = jokerCount === 0 ? 10 : jokerCount === 1 ? 15 : 20;
-                  const jumpDisplayVal = setRow.is_joker
-                    ? (setRow.joker_jump_pct != null ? Math.round(setRow.joker_jump_pct * 100) : defaultJumpPct)
-                    : '';
-                  const jumpCell = setRow.is_joker
-                    ? `<input type="number" min="1" max="100" step="5" value="${escapeAttr(jumpDisplayVal)}" data-set-jump-index="${index}" style="-moz-appearance:textfield;width:52px;" /> %`
-                    : '';
-                  return `
-                  <tr>
-                    <td>${index + 1}</td>
-                    <td><input type="number" min="1" value="${escapeAttr(setRow.reps)}" data-set-reps-index="${index}" /></td>
-                    <td><input type="number" min="1" max="10" step="0.5" placeholder="RPE" value="${escapeAttr(setRow.target_rpe ?? '')}" data-set-rpe-index="${index}" /></td>
-                    <td><input type="checkbox" ${setRow.is_amrap ? "checked" : ""} data-set-amrap-index="${index}" /></td>
-                    <td><input type="checkbox" ${setRow.is_joker ? "checked" : ""} data-set-joker-index="${index}" />${jumpCell}</td>
-                    <td><button class="btn" type="button" data-remove-set-index="${index}" ${draft.sets.length === 1 ? "disabled" : ""}>- Remove</button></td>
-                  </tr>
-                  `;
-                }).join("")}
-              </tbody>
-            </table>
-
-            <div class="row">
-              <button id="movementAddSetBtn" class="btn" type="button">+ Add Set</button>
-              <button id="movementSaveBtn" class="btn primary" type="button" data-day-id="${day.id}">Save Movement</button>
-              <button id="movementCancelBtn" class="btn" type="button">Cancel</button>
-            </div>
-          ` : ""}
-          <div id="movementStatus" class="status"></div>
-        </div>
-      `;
-    }
-
-    function renderDayScreen() {
-      if (!state.programDetail) {
-        refs.programsScreenDay.innerHTML = "";
-        return;
-      }
-
-      const cycle = getSelectedCycle();
-      const days = cycle?.days || [];
-      const day = getSelectedDay();
-      const slots = day ? [...(day.slots || [])].sort((a, b) => a.slot_order - b.slot_order) : [];
-
-      refs.programsScreenDay.innerHTML = `
-        <div class="program-toolbar">
-          <button id="dayBackToProgramBtn" class="btn" type="button">Back</button>
-          <div class="hint" style="margin-left:auto;">${escapeHtml(state.programDetail.name)} / ${escapeHtml(cycle?.label || "")}</div>
-        </div>
-
-        <div class="day-tabs">
-          ${days.map((item) => `
-            <button class="day-tab ${item.id === state.selectedDayId ? "active" : ""}" type="button" data-day-tab="${item.id}">
-              Day ${item.day_number}
-            </button>
-          `).join("")}
-        </div>
-
-        <div class="row" style="margin-top:0;">
-          <button id="addDayBtn" class="btn" type="button">+ Add Day</button>
-          <button id="deleteDayBtn" class="btn" type="button" ${days.length <= 1 ? "disabled" : ""} aria-label="Delete day">&#128465;</button>
-        </div>
-
-        ${day ? `
-          <table class="sheet" style="margin-top:0.65rem;">
-            <thead>
-              <tr>
-                <th style="width:52%;">Movement</th>
-                <th style="width:20%;">Sets</th>
-                <th style="width:14%;">@RPE</th>
-                <th style="width:14%;">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${slots.length
-                ? slots.map((slot, idx) => {
-                  const tmKg = state.tmBySlotId[slot.id] ?? null;
-                  const wmText = tmKg != null ? formatWeightDualFromKg(tmKg * 0.9) : "";
-                  const targetRpe = slot.target_rpe ?? parseJsonSafe(slot.wave_params).target_rpe ?? "-";
-                  const tmControl = state.tmEditingSlotId === slot.id
-                    ? `<input class="tm-input" type="number" step="0.5" min="0" value="${escapeAttr(tmKg ?? "")}" data-tm-input-slot="${slot.id}" placeholder="TM kg" />`
-                    : `<button class="tm-badge ${tmKg == null ? "warn" : ""}" type="button" data-edit-tm-slot="${slot.id}">${tmKg == null ? "Set TM" : `TM: ${escapeHtml(formatWeightDualFromKg(tmKg))}`}</button>`;
-
-                  return `
-                    <tr>
-                      <td>
-                        <span class="movement-main">${escapeHtml(slot.hevy_exercise_name)}</span>
-                        <span class="movement-sub">${tmControl}</span>
-                        <span class="movement-sub">${wmText ? `WM: ${escapeHtml(wmText)}` : ""}</span>
-                      </td>
-                      <td>${escapeHtml(summarizeSets(slot))}</td>
-                      <td>${targetRpe === "-" ? "-" : `@${escapeHtml(String(targetRpe))}`}</td>
-                      <td>
-                        <div class="movement-actions">
-                          <button class="btn" type="button" data-move-slot-up="${slot.id}" ${idx === 0 ? "disabled" : ""}>Up</button>
-                          <button class="btn" type="button" data-move-slot-down="${slot.id}" ${idx === slots.length - 1 ? "disabled" : ""}>Down</button>
-                          <button class="btn" type="button" data-delete-slot="${slot.id}" aria-label="Delete movement">&#128465;</button>
-                        </div>
-                      </td>
-                    </tr>
-                  `;
-                }).join("")
-                : `<tr><td colspan="4" class="hint">No movements yet.</td></tr>`}
-            </tbody>
-          </table>
-
-          <div class="row">
-            <button id="addMovementBtn" class="btn primary" type="button">+ Add Movement</button>
-          </div>
-
-          ${renderMovementBuilder(day)}
-        ` : `<div class="fallback" style="margin-top:0.7rem;">No days in this microcycle yet.</div>`}
-      `;
-
-      if (day && slots.length) {
-        preloadDayTMs(day);
-      }
-    }
-
-    function renderProgramsScreens() {
-      if (state.programsView === "list") {
-        renderProgramsListScreen();
-      }
-      if (state.programsView === "program") {
-        renderProgramDetailScreen();
-      }
-      if (state.programsView === "day") {
-        renderDayScreen();
-      }
-    }
-
-    async function openProgram(programId) {
-      state.selectedProgramId = programId;
-      await refreshSelectedProgram();
-      setProgramsView("program");
-    }
-
-    function openProgramCreateInline() {
-      state.creatingProgram = true;
-      renderProgramsScreens();
-      const input = document.getElementById("newProgramNameInline");
-      if (input) input.focus();
-    }
-
-    function closeProgramCreateInline() {
-      state.creatingProgram = false;
-      renderProgramsScreens();
-    }
-
-    async function submitProgramCreateInline() {
-      const input = document.getElementById("newProgramNameInline");
-      const name = input ? input.value.trim() : "";
-      if (!name) {
-        setStatus(refs.programsStatus, "Program name is required.", "error");
-        return;
-      }
-
-      setStatus(refs.programsStatus, "Creating program...");
-      try {
-        const created = await fetchJson("/programs", {
-          method: "POST",
-          body: JSON.stringify({ name: name.trim(), total_weeks: 1, notes: "" })
-        });
-        state.creatingProgram = false;
-        await loadPrograms();
-        await openProgram(created.id);
-        setStatus(refs.programsStatus, "Program created.", "ok");
-      } catch (error) {
-        setStatus(refs.programsStatus, error.message, "error");
-      }
-    }
-
-    async function persistProgramName(nextName) {
-      if (!state.programDetail) return;
-      try {
-        await fetchJson(`/programs/${state.programDetail.id}`, {
-          method: "PATCH",
-          body: JSON.stringify({ name: nextName })
-        });
-      } catch (_error) {
-        await fetchJson(`/programs/${state.programDetail.id}`, {
-          method: "PUT",
-          body: JSON.stringify({
-            name: nextName,
-            total_weeks: state.programDetail.total_weeks || 1,
-            notes: state.programDetail.notes || ""
-          })
-        });
-      }
-      await loadPrograms();
-      await refreshSelectedProgram();
-      renderProgramsScreens();
-    }
-
-    async function addMicrocycle() {
-      if (!state.programDetail) return;
-      const cycles = state.programDetail.cycles || [];
-      const nextNumber = cycles.length ? Math.max(...cycles.map((row) => row.cycle_number)) + 1 : 1;
-
-      try {
-        const created = await fetchJson(`/programs/${state.programDetail.id}/cycles`, {
-          method: "POST",
-          body: JSON.stringify({ cycle_number: nextNumber, label: `Micro ${nextNumber}` })
-        });
-
-        const day = await fetchJson(`/cycles/${created.id}/days`, {
-          method: "POST",
-          body: JSON.stringify({ day_number: 1, label: "" })
-        });
-
-        await refreshSelectedProgram();
-        state.selectedCycleId = created.id;
-        state.selectedDayId = day.id;
-        state.movementDraft = null;
-        setProgramsView("day");
-      } catch (error) {
-        setStatus(refs.programsStatus, error.message, "error");
-      }
-    }
-
-    async function deleteProgram() {
-      if (!state.programDetail) return;
-      if (!window.confirm("Delete this program?")) return;
-      try {
-        await fetchJson(`/programs/${state.programDetail.id}`, { method: "DELETE" });
-        state.programDetail = null;
-        state.selectedProgramId = null;
-        state.selectedCycleId = null;
-        state.selectedDayId = null;
-        state.movementDraft = null;
-        await loadPrograms();
-        setProgramsView("list");
-      } catch (error) {
-        if (error.message && error.message.toLowerCase().includes("active block")) {
-          refs.programsStatus.className = "status error";
-          refs.programsStatus.innerHTML =
-            `Active block references this program. <button id="abandonAndDeleteBtn" class="btn" type="button" style="margin-left:0.4rem;font-size:0.8rem;">Abandon block &amp; delete</button>`;
+    function _reconstructSetNotation(sets) {
+      if (!Array.isArray(sets) || !sets.length) return "";
+      const groups = [];
+      let i = 0;
+      while (i < sets.length) {
+        const s = sets[i];
+        if (s.is_joker) {
+          // New joker format: Nx1J +pct1,pct2,...  (integer percentages, no J prefix)
+          const pcts = [];
+          while (i < sets.length && sets[i].is_joker) {
+            pcts.push(Math.round((sets[i].joker_jump_pct ?? 0.10) * 100));
+            i++;
+          }
+          groups.push(`${pcts.length}x1J +${pcts.join(",")}`);
+        } else if (s.bbb_pct != null) {
+          let count = 0;
+          while (i + count < sets.length && sets[i + count].bbb_pct != null) count++;
+          const pctInt = Math.round((s.bbb_pct ?? 0.65) * 100);
+          groups.push(`${count}x${s.reps} @.${pctInt} e1RM`);
+          i += count;
+        } else if (s.target_rpe != null) {
+          const reps = s.reps;
+          const rpeGroup = [];
+          while (i < sets.length && !sets[i].is_joker && sets[i].target_rpe != null && sets[i].reps === reps) {
+            rpeGroup.push(sets[i]);
+            i++;
+          }
+          const lastAmrap = rpeGroup[rpeGroup.length - 1].is_amrap ? "+" : "";
+          if (rpeGroup.length === 1) {
+            groups.push(`${rpeGroup[0].reps}@${rpeGroup[0].target_rpe}${lastAmrap}`);
+          } else if (rpeGroup.every(x => x.target_rpe === rpeGroup[0].target_rpe)) {
+            groups.push(`${rpeGroup.length}x${reps}@${rpeGroup[0].target_rpe}${lastAmrap}`);
+          } else {
+            const rpeStr = rpeGroup.map((x, j) =>
+              j === rpeGroup.length - 1 ? `${x.target_rpe}${lastAmrap}` : x.target_rpe
+            ).join(",");
+            groups.push(`${reps}@${rpeStr}`);
+          }
         } else {
-          setStatus(refs.programsStatus, error.message, "error");
+          const reps = s.reps;
+          let count = 0;
+          while (i + count < sets.length && sets[i + count].target_rpe == null && !sets[i + count].is_joker && sets[i + count].bbb_pct == null && sets[i + count].reps === reps) count++;
+          groups.push(`${count}x${reps}`);
+          i += count;
         }
       }
+      return groups.join(" / ");
     }
 
-    async function abandonAndDeleteProgram() {
-      if (!state.programDetail) return;
-      const programId = state.programDetail.id;
-      setStatus(refs.programsStatus, "Working…");
+    function reconstructNotation(programDetail) {
+      if (!programDetail) return "";
+      const lines = [];
+      for (const block of programDetail.blocks || []) {
+        for (const mc of block.microcycles || []) {
+          for (const day of mc.days || []) {
+            const slots = (day.slots || []).slice().sort((a, b) => a.slot_order - b.slot_order);
+            for (let i = 0; i < slots.length; i++) {
+              const slot = slots[i];
+              const sets = Array.isArray(slot.wave_params?.sets) ? slot.wave_params.sets : [];
+              const hasBbb = sets.some(s => s.bbb_pct != null);
+              const tag = hasBbb ? "" : _reconstructSourceTag(slot.source_params);
+              const notation = _reconstructSetNotation(sets);
+              const prefix = i === 0 ? `${block.block_number}.${mc.cycle_number}.${day.day_number} ` : "";
+              lines.push(`${prefix}${slot.hevy_exercise_name || "Unknown"} - ${notation}${tag}`);
+            }
+          }
+        }
+      }
+      return lines.join("\n");
+    }
+
+    // ── Programs tab — autocomplete ───────────────────────────────────────────
+
+    let _acDebounce = null;
+
+    function _acGetExerciseQuery(textarea) {
+      const pos = textarea.selectionStart;
+      const text = textarea.value;
+      const lineStart = text.lastIndexOf("\n", pos - 1) + 1;
+      const lineEnd = text.indexOf("\n", pos);
+      const line = text.slice(lineStart, lineEnd === -1 ? undefined : lineEnd);
+      const cursorInLine = pos - lineStart;
+      const dashIdx = line.indexOf(" - ");
+      const pfxMatch = /^\d+\.\d+\s+/.exec(line);
+      const nameStart = pfxMatch ? pfxMatch[0].length : 0;
+      const nameEnd = dashIdx === -1 ? cursorInLine : Math.min(cursorInLine, dashIdx);
+      if (cursorInLine < nameStart || (dashIdx !== -1 && cursorInLine > dashIdx)) return null;
+      return line.slice(nameStart, nameEnd).trim();
+    }
+
+    function _acShow(query) {
+      const dropdown = document.getElementById("exerciseAutocomplete");
+      if (!dropdown) return;
+      if (!query || query.length < 2) { _acHide(); return; }
+      const q = query.toLowerCase();
+      const matches = state.exercises.filter(e => e.title.toLowerCase().includes(q)).slice(0, 8);
+      if (!matches.length) { _acHide(); return; }
+      dropdown.innerHTML = matches.map(e =>
+        `<div class="autocomplete-item" data-ac-title="${escapeHtml(e.title)}">${escapeHtml(e.title)}</div>`
+      ).join("");
+      dropdown.style.display = "block";
+    }
+
+    function _acHide() {
+      const dropdown = document.getElementById("exerciseAutocomplete");
+      if (dropdown) dropdown.style.display = "none";
+    }
+
+    function _acApply(title) {
+      const textarea = document.getElementById("programTextarea");
+      if (!textarea) return;
+      const pos = textarea.selectionStart;
+      const text = textarea.value;
+      const lineStart = text.lastIndexOf("\n", pos - 1) + 1;
+      const lineEnd = text.indexOf("\n", pos);
+      const line = text.slice(lineStart, lineEnd === -1 ? undefined : lineEnd);
+      const dashIdx = line.indexOf(" - ");
+      const pfxMatch = /^\d+\.\d+\s+/.exec(line);
+      const nameStart = lineStart + (pfxMatch ? pfxMatch[0].length : 0);
+      const nameEnd = lineStart + (dashIdx === -1 ? pos - lineStart : dashIdx);
+      textarea.value = text.slice(0, nameStart) + title + text.slice(nameEnd);
+      const newPos = nameStart + title.length;
+      textarea.setSelectionRange(newPos, newPos);
+      state.programText = textarea.value;
+      _acHide();
+      textarea.focus();
+    }
+
+    // ── Programs tab — render ─────────────────────────────────────────────────
+
+    function renderProgramsLayout() {
+      if (!refs.programsScreen) return;
+      const sel = state.programs.find(p => p.id === state.selectedProgramId);
+      refs.programsScreen.innerHTML = `
+        <div class="programs-layout">
+          <div class="programs-panel">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.55rem;">
+              <span style="font-weight:600;font-size:0.85rem;color:var(--muted);">Programs</span>
+              <button id="programNewBtn" class="btn primary" type="button"
+                style="font-size:0.78rem;padding:0.26rem 0.65rem;">+ New</button>
+            </div>
+            <div>
+              ${state.programs.length
+                ? state.programs.map(p => `
+                  <div class="program-row ${p.id === state.selectedProgramId ? "selected" : ""}"
+                       data-select-program="${p.id}" role="button" tabindex="0"
+                       title="${escapeHtml(p.name)}">
+                    <span class="program-row-name">${escapeHtml(p.name)}</span>
+                    <button class="btn-icon" data-delete-program="${p.id}"
+                      title="Delete" type="button">✕</button>
+                  </div>`).join("")
+                : `<div class="fallback" style="font-size:0.83rem;padding:0.55rem;">No programs yet</div>`}
+            </div>
+          </div>
+
+          <div class="programs-panel">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;margin-bottom:0.5rem;">
+              <span style="font-weight:600;font-size:0.88rem;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                ${sel ? escapeHtml(sel.name) : `<span style="color:var(--muted);font-weight:400;">Select a program</span>`}
+              </span>
+              <div style="display:flex;gap:0.35rem;flex-shrink:0;">
+                ${sel ? `<button id="programActivateBtn" class="btn" type="button"
+                  style="font-size:0.78rem;padding:0.26rem 0.65rem;">Start</button>` : ""}
+                <button id="programImportBtn" class="btn primary" type="button"
+                  style="font-size:0.78rem;padding:0.26rem 0.65rem;"
+                  ${sel ? "" : "disabled"}>Import</button>
+                <button id="programClearBtn" class="btn" type="button"
+                  style="font-size:0.78rem;padding:0.26rem 0.65rem;">Clear</button>
+              </div>
+            </div>
+            <div style="position:relative;">
+              <textarea id="programTextarea" spellcheck="false"
+                style="width:100%;min-height:420px;font-family:Consolas,monospace;font-size:0.9rem;resize:vertical;background:var(--bg-mute);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.7rem;color:var(--text);"
+              >${escapeHtml(state.programText)}</textarea>
+              <div id="exerciseAutocomplete" class="autocomplete-dropdown" style="display:none;position:absolute;left:0;right:0;top:100%;"></div>
+            </div>
+            <div id="programImportResult" style="margin-top:0.45rem;min-height:1.2rem;font-size:0.83rem;"></div>
+            <details style="margin-top:0.6rem;">
+              <summary style="font-size:0.78rem;color:var(--muted);cursor:pointer;user-select:none;">Notation guide</summary>
+              <pre style="margin:0.4rem 0 0;font-size:0.75rem;color:var(--muted);font-family:Consolas,monospace;line-height:1.55;white-space:pre;">{block}.{microcycle}.{day}
+{exercise} - {sets} {source}
+
+Sources: TM90  e1RM  DDP  DDP+5
+Sets:
+  5@7,7.5,8+          working sets, + = AMRAP on last
+  3x1J +10,15,20      joker singles with jump %
+  5x10 @.65 e1RM      BBB sets at % of e1RM
+  4x10 DDP            double progression
+  5x10                free sets
+
+Example:
+1.1.1
+Squat, Low Bar w/ Belt - 5@7,7.5,8+ / 3x1J +10,15,20 TM90
+Bench Press, Wrap Press - 5x10 @.65 e1RM
+Lying Leg Curl - 5x10</pre>
+            </details>
+          </div>
+        </div>
+      `;
+    }
+
+    // ── Programs tab — actions ────────────────────────────────────────────────
+
+    async function selectProgram(programId) {
+      state.selectedProgramId = programId;
+      setStatus(refs.programsStatus, "");
+      renderProgramsLayout();
       try {
-        const blocks = await fetchJson("/active-blocks", { method: "GET" });
-        const matching = blocks.filter(b => b.program_id === programId);
-        for (const block of matching) {
-          await fetchJson(`/active-blocks/${block.id}`, { method: "DELETE" });
-        }
-        await fetchJson(`/programs/${programId}`, { method: "DELETE" });
-        const storedId = localStorage.getItem(STORAGE_KEYS.activeBlockId);
-        if (storedId && matching.some(b => String(b.id) === storedId)) {
-          localStorage.removeItem(STORAGE_KEYS.activeBlockId);
-          woActiveBlock = null;
-        }
-        state.programDetail = null;
-        state.selectedProgramId = null;
-        state.selectedCycleId = null;
-        state.selectedDayId = null;
-        state.movementDraft = null;
-        await loadPrograms();
-        setProgramsView("list");
-        setStatus(refs.programsStatus, "Program deleted.", "ok");
+        const detail = await fetchJson(`/programs/${programId}`, { method: "GET" });
+        state.programDetail = normalizeProgramDetail(detail);
+        state.programText = reconstructNotation(state.programDetail);
+        renderProgramsLayout();
+        document.getElementById("programTextarea")?.focus();
       } catch (err) {
         setStatus(refs.programsStatus, err.message, "error");
       }
     }
 
-    async function openCycleAtFirstDay(cycleId) {
-      if (!state.programDetail) return;
-      const cycle = (state.programDetail.cycles || []).find((row) => row.id === cycleId);
-      if (!cycle) return;
-
-      let day = (cycle.days || [])[0] || null;
-      if (!day) {
-        day = await fetchJson(`/cycles/${cycle.id}/days`, {
-          method: "POST",
-          body: JSON.stringify({ day_number: 1, label: "" })
-        });
-        await refreshSelectedProgram();
-      }
-
-      state.selectedCycleId = cycleId;
-      state.selectedDayId = day.id;
-      state.movementDraft = null;
-      setProgramsView("day");
-    }
-
-    async function deleteCycle(cycleId) {
-      if (!window.confirm("Delete this microcycle?")) return;
+    async function createNewProgram() {
+      const name = (window.prompt("Program name:") || "").trim();
+      if (!name) return;
       try {
-        await fetchJson(`/cycles/${cycleId}`, { method: "DELETE" });
-        await refreshSelectedProgram();
-        setProgramsView("program");
-      } catch (error) {
-        setStatus(refs.programsStatus, error.message, "error");
+        const program = await fetchJson("/programs", {
+          method: "POST",
+          body: JSON.stringify({ name, total_weeks: 1, notes: "" })
+        });
+        await loadPrograms();
+        state.programText = "";
+        await selectProgram(program.id);
+      } catch (err) {
+        setStatus(refs.programsStatus, err.message, "error");
       }
     }
 
-    async function addDay() {
-      const cycle = getSelectedCycle();
-      if (!cycle) return;
-      const nextDayNumber = (cycle.days || []).length ? Math.max(...cycle.days.map((row) => row.day_number)) + 1 : 1;
+    async function deleteProgram(programId) {
+      const p = state.programs.find(x => x.id === programId);
+      if (!p || !window.confirm(`Delete "${p.name}"?`)) return;
       try {
-        const created = await fetchJson(`/cycles/${cycle.id}/days`, {
-          method: "POST",
-          body: JSON.stringify({ day_number: nextDayNumber, label: "" })
-        });
-        await refreshSelectedProgram();
-        state.selectedDayId = created.id;
-        state.movementDraft = null;
-        renderProgramsScreens();
-      } catch (error) {
-        setStatus(refs.programsStatus, error.message, "error");
-      }
-    }
-
-    async function deleteDay() {
-      const cycle = getSelectedCycle();
-      const day = getSelectedDay();
-      if (!cycle || !day) return;
-      if ((cycle.days || []).length <= 1) {
-        setStatus(refs.programsStatus, "At least one day is required.", "error");
-        return;
-      }
-      if (!window.confirm("Delete this day?")) return;
-
-      try {
-        await fetchJson(`/days/${day.id}`, { method: "DELETE" });
-        await refreshSelectedProgram();
-        const nextDay = getSelectedCycle()?.days?.[0] || null;
-        state.selectedDayId = nextDay ? nextDay.id : null;
-        state.movementDraft = null;
-        renderProgramsScreens();
-      } catch (error) {
-        setStatus(refs.programsStatus, error.message, "error");
-      }
-    }
-
-    async function ensureAutoTierIds() {
-      if (!state.programDetail) return { primaryId: null, supplementalId: null };
-      let tiers = [...(state.programDetail.tiers || [])];
-
-      let primary = tiers.find((row) => (row.name || "").trim().toLowerCase() === "primary") || tiers[0] || null;
-      let supplemental = tiers.find((row) => (row.name || "").trim().toLowerCase() === "supplemental") || tiers[1] || null;
-
-      if (!primary) {
-        primary = await fetchJson(`/programs/${state.programDetail.id}/tiers`, {
-          method: "POST",
-          body: JSON.stringify({ name: "Primary", behaviour: "percentage", display_order: 0 })
-        });
-      }
-      if (!supplemental) {
-        supplemental = await fetchJson(`/programs/${state.programDetail.id}/tiers`, {
-          method: "POST",
-          body: JSON.stringify({ name: "Supplemental", behaviour: "percentage", display_order: 1 })
-        });
-      }
-
-      await refreshSelectedProgram();
-      tiers = [...(state.programDetail.tiers || [])];
-      const finalPrimary = tiers.find((row) => (row.name || "").trim().toLowerCase() === "primary") || tiers[0] || null;
-      const finalSupplemental = tiers.find((row) => (row.name || "").trim().toLowerCase() === "supplemental") || tiers[1] || finalPrimary || null;
-      return {
-        primaryId: finalPrimary?.id || null,
-        supplementalId: finalSupplemental?.id || null
-      };
-    }
-
-    async function fetchExerciseSearch(query) {
-      const rows = await fetchJson(`/exercises?q=${encodeURIComponent(query)}`, { method: "GET" });
-      const list = Array.isArray(rows) ? rows : [];
-      const normalized = (query || "").trim().toLowerCase();
-      return list
-        .filter((row) => !normalized || (row.title || "").toLowerCase().includes(normalized))
-        .slice(0, 25);
-    }
-
-    function openMovementBuilder() {
-      state.movementDraft = {
-        open: true,
-        query: "",
-        results: [],
-        selectedExercise: null,
-        sets: [{ reps: 5, is_amrap: false, is_joker: false, target_rpe: null, joker_jump_pct: null }]
-      };
-      renderProgramsScreens();
-    }
-
-    async function saveMovement(dayId) {
-      const day = getSelectedDay();
-      const draft = state.movementDraft;
-      if (!day || !draft || !draft.selectedExercise) return;
-
-      const setRows = (draft.sets || []).map((setRow) => {
-        const obj = {
-          reps: Number(setRow.reps) || 1,
-          is_amrap: Boolean(setRow.is_amrap),
-          is_joker: Boolean(setRow.is_joker),
-          target_rpe: Number.isFinite(Number(setRow.target_rpe)) ? Number(setRow.target_rpe) : null
-        };
-        if (obj.is_joker && setRow.joker_jump_pct != null) {
-          obj.joker_jump_pct = Number(setRow.joker_jump_pct);
+        await fetchJson(`/programs/${programId}`, { method: "DELETE" });
+        if (state.selectedProgramId === programId) {
+          state.selectedProgramId = null;
+          state.programDetail = null;
+          state.programText = "";
         }
-        return obj;
-      });
+        await loadPrograms();
+      } catch (err) {
+        if (err.message?.toLowerCase().includes("active block")) {
+          refs.programsStatus.className = "status error";
+          refs.programsStatus.innerHTML =
+            `Active block references this program. <button id="abandonAndDeleteBtn" class="btn" type="button"
+             data-abandon-program="${programId}" style="margin-left:0.4rem;font-size:0.8rem;">Abandon &amp; Delete</button>`;
+        } else {
+          setStatus(refs.programsStatus, err.message, "error");
+        }
+      }
+    }
 
-      const firstSetRpe = setRows[0]?.target_rpe ?? null;
-      const waveParams = { sets: setRows };
+    async function abandonAndDeleteProgram(programId) {
+      const pid = programId || state.programDetail?.id;
+      if (!pid) return;
+      setStatus(refs.programsStatus, "Working…");
+      try {
+        const blocks = await fetchJson("/active-blocks", { method: "GET" });
+        const matching = blocks.filter(b => b.program_id === pid);
+        for (const block of matching) {
+          await fetchJson(`/active-blocks/${block.id}`, { method: "DELETE" });
+        }
+        await fetchJson(`/programs/${pid}`, { method: "DELETE" });
+        const storedId = localStorage.getItem(STORAGE_KEYS.activeBlockId);
+        if (storedId && matching.some(b => String(b.id) === storedId)) {
+          localStorage.removeItem(STORAGE_KEYS.activeBlockId);
+          woActiveBlock = null;
+        }
+        if (state.selectedProgramId === pid) {
+          state.selectedProgramId = null;
+          state.programDetail = null;
+          state.programText = "";
+        }
+        await loadPrograms();
+        setStatus(refs.programsStatus, "");
+      } catch (err) {
+        setStatus(refs.programsStatus, err.message, "error");
+      }
+    }
 
-      const slotOrder = (day.slots || []).length;
-      const tierIds = await ensureAutoTierIds();
-      const tierId = slotOrder === 0 ? tierIds.primaryId : tierIds.supplementalId;
-      if (!tierId) {
-        setStatus(refs.programsStatus, "Unable to assign movement position.", "error");
+    async function importProgram() {
+      if (!state.selectedProgramId) {
+        showProgramMessage('Select a program first', 'error');
         return;
       }
-
+      const textarea = document.getElementById("programTextarea");
+      const text = (textarea?.value || "").trim();
+      const resultEl = document.getElementById("programImportResult");
+      if (!state.selectedProgramId) { setImportResult(resultEl, "Select a program first.", "error"); return; }
+      if (!text) { setImportResult(resultEl, "Paste program notation first.", "error"); return; }
+      setImportResult(resultEl, "Importing…", "");
       try {
-        const newSlot = await fetchJson(`/days/${dayId}/slots`, {
+        console.log('Importing to program:', state.selectedProgramId);
+        const result = await fetchJson(`/programs/${state.selectedProgramId}/import`, {
           method: "POST",
-          body: JSON.stringify({
-            tier_id: tierId,
-            hevy_exercise_id: draft.selectedExercise.id,
-            hevy_exercise_name: draft.selectedExercise.title,
-            slot_order: slotOrder,
-            wave_params: waveParams,
-            target_rpe: firstSetRpe
-          })
+          body: JSON.stringify({ text })
         });
-        // Silently attempt to auto-populate TM from e1RM history
+        const msg = `Imported: ${result.blocks} blocks, ${result.microcycles} microcycles, ${result.days} days, ${result.slots} slots.`;
+        const errSuffix = result.errors?.length
+          ? ` ${result.errors.length} exercise(s) not matched.`
+          : "";
+        setImportResult(resultEl, msg + errSuffix, result.errors?.length ? "warn" : "ok");
+        const detail = await fetchJson(`/programs/${state.selectedProgramId}`, { method: "GET" });
+        state.programDetail = normalizeProgramDetail(detail);
+        state.programText = reconstructNotation(state.programDetail);
+        renderProgramsLayout();
+        document.getElementById("programImportResult").textContent = msg + errSuffix;
+      } catch (err) {
+        const detail = err.message;
+        setImportResult(resultEl, `Error: ${detail}`, "error");
+      }
+    }
+
+    function setImportResult(el, msg, tone) {
+      if (!el) return;
+      el.textContent = msg;
+      el.style.color = tone === "error" ? "var(--error)" : tone === "ok" ? "var(--ok)" : "var(--muted)";
+    }
+
+    async function activateProgramAndGo() {
+      if (!state.programDetail) return;
+      setStatus(refs.programsStatus, "Activating…");
+      try {
+        const created = await fetchJson("/active-blocks", {
+          method: "POST",
+          body: JSON.stringify({ program_id: state.programDetail.id })
+        });
+        localStorage.setItem(STORAGE_KEYS.activeBlockId, String(created.id));
+        woActiveBlock = created;
+        setStatus(refs.programsStatus, "Block activated.", "ok");
+        activateTab("workout");
+        await woLoadHome();
+      } catch (error) {
+        setStatus(refs.programsStatus, error.message, "error");
+      }
+    }
+
+    function formatLoading(slot) {
+      const rawWave = slot?.wave_params;
+      if (rawWave == null) return "—";
+
+      let wave;
+      if (typeof rawWave === "string") {
         try {
-          const e1rmData = await fetchJson(`/exercises/${encodeURIComponent(draft.selectedExercise.id)}/e1rm`);
-          if (e1rmData?.e1rm_kg != null) {
-            await fetchJson(`/settings/tm`, {
-              method: "POST",
-              body: JSON.stringify({ slot_id: newSlot.id, value_kg: e1rmData.e1rm_kg })
-            });
-          }
-        } catch (_) { /* 404 or network error — TM stays unset, amber badge shows */ }
-        await refreshSelectedProgram();
-        state.movementDraft = null;
-        renderProgramsScreens();
-      } catch (error) {
-        setStatus(refs.programsStatus, error.message, "error");
+          wave = JSON.parse(rawWave);
+        } catch (_error) {
+          return "—";
+        }
+      } else if (typeof rawWave === "object") {
+        wave = rawWave;
+      } else {
+        return "—";
       }
-    }
 
-    async function deleteSlot(slotId) {
-      if (!window.confirm("Delete this movement?")) return;
-      try {
-        await fetchJson(`/slots/${slotId}`, { method: "DELETE" });
-        await refreshSelectedProgram();
-        renderProgramsScreens();
-      } catch (error) {
-        setStatus(refs.programsStatus, error.message, "error");
-      }
-    }
+      const rows = Array.isArray(wave?.sets) ? wave.sets : null;
+      if (!rows || !rows.length) return "—";
 
-    async function updateSlotOrder(slot, slotOrder) {
-      await fetchJson(`/slots/${slot.id}`, {
-        method: "PUT",
-        body: JSON.stringify({
-          tier_id: slot.tier_id,
-          hevy_exercise_id: slot.hevy_exercise_id,
-          hevy_exercise_name: slot.hevy_exercise_name,
-          slot_order: slotOrder,
-          wave_params: parseJsonSafe(slot.wave_params),
-          target_rpe: slot.target_rpe
-        })
+      const loading = rows.map((setRow) => {
+        const reps = Number(setRow?.reps);
+        if (!Number.isFinite(reps) || reps <= 0) return null;
+
+        if (setRow?.is_joker) {
+          return `${reps}J`;
+        }
+
+        const rpe = Number(setRow?.target_rpe);
+        if (!Number.isFinite(rpe)) return null;
+
+        return setRow?.is_amrap ? `${reps}+@${rpe}` : `${reps}@${rpe}`;
       });
+
+      return loading.every(Boolean) ? loading.join(" / ") : "—";
     }
 
-    async function moveSlot(slotId, delta) {
-      const day = getSelectedDay();
-      if (!day) return;
-      const slots = [...(day.slots || [])].sort((a, b) => a.slot_order - b.slot_order);
-      const index = slots.findIndex((slot) => slot.id === slotId);
-      const nextIndex = index + delta;
-      if (index < 0 || nextIndex < 0 || nextIndex >= slots.length) return;
 
-      const source = slots[index];
-      const target = slots[nextIndex];
-      const sourceOrder = source.slot_order;
-      const targetOrder = target.slot_order;
-
-      try {
-        await updateSlotOrder(source, targetOrder);
-        await updateSlotOrder(target, sourceOrder);
-        await refreshSelectedProgram();
-        renderProgramsScreens();
-      } catch (error) {
-        setStatus(refs.programsStatus, error.message, "error");
-      }
-    }
-
-    function getCycleLabel(programId, cycleNumber) {
-      const program = state.programs.find((p) => p.id === programId);
-      if (!program || !state.programDetail || state.programDetail.id !== programId) return `Micro ${cycleNumber}`;
-      const cycle = (state.programDetail.cycles || []).find((c) => c.cycle_number === cycleNumber);
-      return cycle ? cycle.label || `Micro ${cycle.cycle_number}` : `Micro ${cycleNumber}`;
-    }
 
     // ── Workout tab ──────────────────────────────────────────────────────────────
 
@@ -1840,9 +1597,11 @@
 
     function woGetCycleLabel() {
       if (!woActiveBlock) return '';
-      const cycle = (state.programDetail?.cycles || [])
-        .find(c => c.cycle_number === woActiveBlock.current_cycle);
-      return cycle ? (cycle.label || `Micro ${cycle.cycle_number}`) : `Micro ${woActiveBlock.current_cycle}`;
+      for (const block of state.programDetail?.blocks || []) {
+        const mc = (block.microcycles || []).find(c => c.cycle_number === woActiveBlock.current_cycle);
+        if (mc) return mc.label || `Micro ${mc.cycle_number}`;
+      }
+      return `Micro ${woActiveBlock.current_cycle}`;
     }
 
     async function woLoadHome() {
@@ -1921,18 +1680,25 @@
       woSessionInputs = {};
       for (const slot of woSessionData.slots) {
         woSessionInputs[slot.slot_id] = {
-          sets: slot.sets.map(() => ({ actual_reps: null, actual_rpe: null, actual_weight_kg: null, joker_skipped: false }))
+          notes: '',
+          sets: slot.sets.map(s => ({
+            set_type: s.is_joker ? 'joker' : s.is_amrap ? 'amrap' : 'working',
+            actual_reps: null,
+            actual_rpe: null,
+            actual_weight_kg: null,
+            done: false
+          }))
         };
       }
     }
 
-    function woAmrapDone() {
+    function woAllDone() {
       if (!woSessionData) return false;
       for (const slot of woSessionData.slots) {
-        for (let i = 0; i < slot.sets.length; i++) {
-          if (!slot.sets[i].is_amrap) continue;
-          const inp = woSessionInputs[slot.slot_id]?.sets[i];
-          if (!inp || !Number.isFinite(inp.actual_reps) || inp.actual_reps < 1) return false;
+        const inputs = woSessionInputs[slot.slot_id];
+        if (!inputs) return false;
+        for (const inp of inputs.sets) {
+          if (!inp.done) return false;
         }
       }
       return true;
@@ -1940,22 +1706,204 @@
 
     function woUpdateFinishBtn() {
       const btn = document.getElementById('woFinishBtn');
-      if (btn) btn.disabled = !woAmrapDone();
+      if (btn) btn.disabled = !woAllDone();
     }
 
-    function woUpdateE1rmCell(slotId, setIdx) {
-      const el = document.getElementById(`wo-e1rm-${slotId}-${setIdx}`);
-      if (!el || !woSessionData) return;
-      const slot = woSessionData.slots.find(s => String(s.slot_id) === String(slotId));
+    function woUpdateE1rmRow(slotId, setIdx) {
+      const e1rmEl = document.getElementById(`wo-e1rm-row-${slotId}-${setIdx}`);
+      if (!e1rmEl) return;
+      const inp = woSessionInputs[slotId]?.sets[setIdx];
+      if (!inp || inp.set_type !== 'amrap') return;
+      const slot = woSessionData?.slots.find(s => String(s.slot_id) === String(slotId));
       if (!slot) return;
       const s = slot.sets[setIdx];
-      if (!s?.is_amrap) return;
-      const inp = woSessionInputs[slotId]?.sets[setIdx];
-      if (!inp) return;
       const w = s.planned_weight_kg != null ? woRound25(s.planned_weight_kg) : null;
       const r = inp.actual_reps;
-      const e = w != null && Number.isFinite(r) && r > 0 ? woComputeE1rm(w, r) : null;
-      el.textContent = e != null ? woFormatE1rm(e) : '';
+      const hasRpe = inp.actual_rpe != null;
+      const e = w != null && Number.isFinite(r) && r > 0 && hasRpe ? woComputeE1rm(w, r) : null;
+      e1rmEl.textContent = e != null ? `e1RM: ${woFormatE1rm(e)}` : '';
+    }
+
+    function woBadgeStyle(type) {
+      const m = {
+        working: { bg: 'var(--bg-soft)',             color: 'var(--muted)' },
+        amrap:   { bg: 'rgba(100,160,255,0.18)',     color: '#7ab4ff' },
+        joker:   { bg: 'rgba(201,151,47,0.18)',      color: '#ffd98a' },
+        free:    { bg: 'var(--bg-soft)',             color: 'var(--muted)' }
+      };
+      return m[type] || m.working;
+    }
+
+    function woBadgeLetter(type) {
+      return { working: 'W', amrap: '+', joker: 'J', free: 'F' }[type] || 'W';
+    }
+
+    function woRenderSetRow(slot, slotId, i, inp) {
+      const s      = slot.sets[i];
+      const type   = inp.set_type || 'working';
+      const done   = inp.done || false;
+      const bs     = woBadgeStyle(type);
+      const letter = woBadgeLetter(type);
+
+      const badge = `<div class="wo-set-badge" style="background:${bs.bg};color:${bs.color};"
+        data-badge-slot="${slotId}" data-badge-set="${i}">${letter}</div>`;
+
+      let loadHtml;
+      if (type === 'free') {
+        loadHtml = `<span style="color:var(--muted);">—</span>`;
+      } else if (type === 'joker') {
+        const preKg  = s.planned_weight_kg != null ? woRound25(s.planned_weight_kg) : '';
+        const lbsVal = preKg !== '' ? woKgToLbs(preKg) : '';
+        const lbsDiv = lbsVal !== '' ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">${lbsVal}lbs</div>` : '';
+        loadHtml = `<div><input type="number" step="2.5" value="${escapeAttr(String(preKg))}"
+          class="wo-card-input wo-joker-weight" data-slot="${slotId}" data-set="${i}"
+          style="width:70px;font-size:14px;" />${lbsDiv}</div>`;
+      } else {
+        const wkg = s.planned_weight_kg != null ? woRound25(s.planned_weight_kg) : null;
+        if (wkg != null) {
+          const wlbs = woKgToLbs(wkg);
+          loadHtml = `<div><strong style="font-size:14px;">${wkg}kg</strong>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;">${wlbs}lbs</div></div>`;
+        } else {
+          loadHtml = `<span style="color:var(--muted);">—</span>`;
+        }
+      }
+
+      let repsValue = '';
+      if (inp.actual_reps != null)            repsValue = String(inp.actual_reps);
+      else if (type === 'joker')              repsValue = '1';
+      else if (type !== 'amrap' && s.reps != null) repsValue = String(s.reps);
+      const repsInput = `<input type="number" min="1" step="1" value="${escapeAttr(repsValue)}"
+        class="wo-card-input wo-actual-reps" data-slot="${slotId}" data-set="${i}"
+        style="width:44px;font-size:14px;text-align:center;"
+        placeholder="${type === 'amrap' ? '★' : ''}" />`;
+
+      let rpeHtml;
+      if (type === 'joker' || type === 'free') {
+        rpeHtml = `<span style="color:var(--muted);font-size:12px;text-align:center;display:block;">—</span>`;
+      } else if (s.target_rpe != null) {
+        const pct = s.rpe_percentage != null ? Math.round(s.rpe_percentage * 100) : null;
+        const txt = pct != null ? `${s.target_rpe} / ${pct}%` : `@${s.target_rpe}`;
+        rpeHtml = `<span style="color:var(--muted);font-size:12px;text-align:center;display:block;">${txt}</span>`;
+      } else {
+        rpeHtml = `<span style="color:var(--muted);font-size:12px;text-align:center;display:block;">—</span>`;
+      }
+
+      const actualRpeInput = `<input type="number" min="1" max="10" step="0.5"
+        value="${escapeAttr(inp.actual_rpe != null ? String(inp.actual_rpe) : '')}"
+        class="wo-card-input wo-actual-rpe-input" data-slot="${slotId}" data-set="${i}"
+        style="width:44px;font-size:14px;text-align:center;" placeholder="—" />`;
+
+      const checkBtn = `<button class="wo-check-btn${done ? ' done' : ''}"
+        data-check-slot="${slotId}" data-check-set="${i}" type="button">✓</button>`;
+
+      const rowBg = type === 'amrap' ? 'background:rgba(100,160,255,0.07);' : '';
+      return `<div class="wo-set-row" data-row-slot="${slotId}" data-row-set="${i}" style="${rowBg}">${badge}${loadHtml}${repsInput}${rpeHtml}${actualRpeInput}${checkBtn}</div>`;
+    }
+
+    function woRenderCard(slot) {
+      const slotId = slot.slot_id;
+      const inputs = woSessionInputs[slotId];
+      if (!inputs) return '';
+
+      const colHdr = `<div style="display:grid;grid-template-columns:28px 1fr 52px 56px 52px 36px;gap:6px;padding:5px 12px 3px;font-size:10px;color:var(--muted);">
+        <div></div><div>Load</div><div style="text-align:center;">Reps</div>
+        <div style="text-align:center;">@RPE</div><div style="text-align:center;">a.RPE</div><div></div>
+      </div>`;
+
+      let rowsHtml = '';
+      for (let i = 0; i < slot.sets.length; i++) {
+        const inp = inputs.sets[i];
+        rowsHtml += woRenderSetRow(slot, slotId, i, inp);
+        if (inp.set_type === 'amrap') {
+          const w = slot.sets[i].planned_weight_kg != null ? woRound25(slot.sets[i].planned_weight_kg) : null;
+          const r = inp.actual_reps;
+          const hasRpe = inp.actual_rpe != null;
+          const e = w != null && Number.isFinite(r) && r > 0 && hasRpe ? woComputeE1rm(w, r) : null;
+          rowsHtml += `<div id="wo-e1rm-row-${slotId}-${i}" style="padding:2px 12px 7px;font-size:12px;color:var(--muted);">${e != null ? `e1RM: ${woFormatE1rm(e)}` : ''}</div>`;
+        }
+      }
+
+      return `<div class="wo-slot-card" id="wo-card-${slotId}">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px 8px;border-bottom:0.5px solid var(--border);">
+          <span style="font-weight:500;font-size:14px;">${escapeHtml(slot.exercise_name)}</span>
+          <button type="button" data-notes-toggle="${slotId}"
+            style="background:none;border:none;color:var(--muted);font-size:13px;cursor:pointer;padding:0;">Notes ▾</button>
+        </div>
+        <div id="wo-notes-area-${slotId}" style="display:none;padding:8px 12px;">
+          <textarea placeholder="Notes…" data-notes-slot="${slotId}"
+            style="width:100%;min-height:56px;border:1px solid var(--border);border-radius:6px;background:var(--bg-elev);color:var(--text);padding:6px 8px;font-size:13px;resize:vertical;"
+          >${escapeHtml(inputs.notes || '')}</textarea>
+        </div>
+        ${colHdr}
+        <div id="wo-rows-${slotId}">${rowsHtml}</div>
+      </div>`;
+    }
+
+    function woShowBottomSheet(slotId, setIdx) {
+      woCloseBottomSheet();
+      const types = [
+        { type: 'working', letter: 'W', label: 'Working Set' },
+        { type: 'amrap',   letter: '+', label: 'AMRAP Set' },
+        { type: 'joker',   letter: 'J', label: 'Joker Set' },
+        { type: 'free',    letter: 'F', label: 'Free Set' },
+        { type: 'remove',  letter: '×', label: 'Remove Set', danger: true }
+      ];
+      const optHtml = types.map(t =>
+        `<div class="wo-sheet-option" data-sheet-type="${t.type}"
+          data-sheet-slot="${slotId}" data-sheet-set="${setIdx}"
+          ${t.danger ? 'style="color:var(--error);"' : ''}>
+          <span style="font-weight:600;min-width:20px;">${t.letter}</span>
+          <span>${t.label}</span>
+        </div>`).join('');
+
+      const overlay = document.createElement('div');
+      overlay.id = 'wo-sheet-overlay';
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:99;background:rgba(0,0,0,0.4);display:flex;align-items:flex-end;';
+      overlay.innerHTML = `<div class="wo-bottom-sheet">${
+        `<div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 12px;"></div>` +
+        `<div style="text-align:center;font-size:15px;font-weight:500;margin-bottom:12px;">Select Set Type</div>` +
+        optHtml
+      }</div>`;
+      document.body.appendChild(overlay);
+      overlay.addEventListener('click', e => {
+        const opt = e.target.closest('[data-sheet-type]');
+        if (opt) woHandleSheetSelect(opt.getAttribute('data-sheet-type'),
+          opt.getAttribute('data-sheet-slot'), Number(opt.getAttribute('data-sheet-set')));
+        else if (e.target === overlay) woCloseBottomSheet();
+      });
+    }
+
+    function woCloseBottomSheet() {
+      document.getElementById('wo-sheet-overlay')?.remove();
+    }
+
+    function woHandleSheetSelect(type, slotId, setIdx) {
+      woCloseBottomSheet();
+      if (!woSessionData || !woSessionInputs[slotId]) return;
+      const slotInputs = woSessionInputs[slotId];
+      const slot = woSessionData.slots.find(s => String(s.slot_id) === String(slotId));
+      if (!slot) return;
+
+      if (type === 'remove') {
+        slotInputs.sets.splice(setIdx, 1);
+        slot.sets.splice(setIdx, 1);
+        const cardEl = document.getElementById(`wo-card-${slotId}`);
+        if (cardEl) { const t = document.createElement('div'); t.innerHTML = woRenderCard(slot); cardEl.replaceWith(t.firstElementChild); }
+        woUpdateFinishBtn();
+        return;
+      }
+
+      slotInputs.sets[setIdx].set_type = type;
+      const rowEl = document.querySelector(`[data-row-slot="${slotId}"][data-row-set="${setIdx}"]`);
+      if (rowEl) {
+        const t = document.createElement('div');
+        t.innerHTML = woRenderSetRow(slot, slotId, setIdx, slotInputs.sets[setIdx]);
+        rowEl.replaceWith(t.firstElementChild);
+        // Toggle e1RM row visibility
+        const e1rmRow = document.getElementById(`wo-e1rm-row-${slotId}-${setIdx}`);
+        if (e1rmRow && type !== 'amrap') e1rmRow.remove();
+      }
     }
 
     function woRenderSession() {
@@ -1963,93 +1911,19 @@
       if (!el || !woSessionData) { if (el) el.innerHTML = ''; return; }
 
       const slots = woSessionData.slots || [];
-      const pref  = woUnitPref();
       const pName = state.programDetail?.id === woActiveBlock?.program_id
         ? escapeHtml(state.programDetail.name) : '';
       const parts = [pName, escapeHtml(woGetCycleLabel()), `Day ${woActiveBlock?.current_day ?? ''}`].filter(Boolean);
 
       const cardsHtml = !slots.length
         ? `<div class="fallback" style="margin:0.7rem;">No movements planned for this day.</div>`
-        : slots.map(slot => {
-          let rowsHtml = '';
-          for (let i = 0; i < slot.sets.length; i++) {
-            const s   = slot.sets[i];
-            const inp = woSessionInputs[slot.slot_id]?.sets[i] || {};
-            const dim = s.is_joker && inp.joker_skipped ? 'wo-dimmed' : '';
-            const pair = `data-pair-slot="${slot.slot_id}" data-pair-set="${i}"`;
-
-            const label = s.is_joker ? `${i+1}J` : s.is_amrap ? `${i+1}+` : `${i+1}`;
-
-            // Load cell (Row A)
-            let loadCell;
-            if (s.is_joker) {
-              const preKg  = s.bbb_weight_kg ?? s.planned_weight_kg;
-              const preVal = preKg != null ? woRound25(preKg) : '';
-              const lbsNote = preVal !== '' ? `<div style="font-size:0.7rem;color:var(--muted);">${woKgToLbs(preVal)}lbs</div>` : '';
-              loadCell = `<input type="number" step="0.5" value="${escapeAttr(preVal)}" class="wo-joker-weight" data-slot="${slot.slot_id}" data-set="${i}" style="width:72px;" placeholder="kg" />${lbsNote}`;
-            } else {
-              loadCell = s.planned_weight_kg != null
-                ? escapeHtml(woFormatLoad(s.planned_weight_kg, pref))
-                : '<span style="color:var(--muted);">—</span>';
-            }
-
-            const amrapInput = s.is_amrap
-              ? `&ensp;<input type="number" min="1" step="1" value="${escapeAttr(inp.actual_reps ?? '')}" class="wo-amrap-reps" data-slot="${slot.slot_id}" data-set="${i}" style="width:56px;" placeholder="Reps" />`
-              : '';
-
-            const skipToggle = s.is_joker
-              ? `<label style="font-size:0.78rem;white-space:nowrap;cursor:pointer;margin-left:0.4rem;"><input type="checkbox" class="wo-joker-skip" data-slot="${slot.slot_id}" data-set="${i}" ${inp.joker_skipped ? 'checked' : ''} />&thinsp;Skip</label>`
-              : '';
-
-            // @RPE(%) label (Row B)
-            let rpeTxt = '';
-            if (s.target_rpe != null) {
-              const pct = s.rpe_percentage != null ? ` / ${Math.round(s.rpe_percentage * 100)}%` : '';
-              rpeTxt = `@${s.target_rpe}${pct}`;
-            }
-
-            // e1RM cell (Row B) — pre-render if reps already filled
-            let e1rmTxt = '';
-            if (s.is_amrap) {
-              const w = s.planned_weight_kg != null ? woRound25(s.planned_weight_kg) : null;
-              const r = inp.actual_reps;
-              const e = w != null && Number.isFinite(r) && r > 0 ? woComputeE1rm(w, r) : null;
-              e1rmTxt = e != null ? escapeHtml(woFormatE1rm(e)) : '';
-            }
-
-            rowsHtml += `
-              <tr class="row-a ${dim}" ${pair}>
-                <td style="font-weight:${s.is_amrap ? 700 : 400};white-space:nowrap;">${escapeHtml(label)}</td>
-                <td colspan="3">${loadCell}${amrapInput}${skipToggle}</td>
-              </tr>
-              <tr class="row-b ${dim}" ${pair}>
-                <td></td>
-                <td style="color:var(--muted);font-size:0.75rem;">${escapeHtml(rpeTxt)}</td>
-                <td><input type="number" min="1" max="10" step="0.5" value="${escapeAttr(inp.actual_rpe ?? '')}" class="wo-actual-rpe" data-slot="${slot.slot_id}" data-set="${i}" style="width:52px;" placeholder="—" /></td>
-                <td style="font-size:0.78rem;color:var(--accent);" id="wo-e1rm-${slot.slot_id}-${i}">${e1rmTxt}</td>
-              </tr>`;
-          }
-
-          return `
-            <div class="wo-slot-card">
-              <div class="wo-slot-head">${escapeHtml(slot.exercise_name)}</div>
-              <table class="wo-sets-table">
-                <thead><tr>
-                  <th style="width:10%;">Set</th>
-                  <th style="width:48%;">Load</th>
-                  <th style="width:20%;">a.RPE</th>
-                  <th style="width:22%;">e1RM</th>
-                </tr></thead>
-                <tbody>${rowsHtml}</tbody>
-              </table>
-            </div>`;
-        }).join('');
+        : slots.map(slot => woRenderCard(slot)).join('');
 
       el.innerHTML = `
         <div class="wo-sticky-header">
           <span class="wo-title">${parts.join(' — ')}</span>
           <button id="woBackFromSessionBtn" class="btn" type="button">Back</button>
-          <button id="woFinishBtn" class="btn primary" type="button" ${woAmrapDone() ? '' : 'disabled'}>Finish Session</button>
+          <button id="woFinishBtn" class="btn primary" type="button" ${woAllDone() ? '' : 'disabled'}>Finish Session</button>
         </div>
         ${cardsHtml}
         <div style="height:0.8rem;"></div>`;
@@ -2104,20 +1978,19 @@
         for (let i = 0; i < slot.sets.length; i++) {
           const s   = slot.sets[i];
           const inp = woSessionInputs[slot.slot_id]?.sets[i] || {};
-          if (s.is_joker && inp.joker_skipped) continue;
-          const setType   = s.is_joker ? 'joker' : s.is_amrap ? 'amrap' : 'working';
+          const setType   = inp.set_type || (s.is_joker ? 'joker' : s.is_amrap ? 'amrap' : 'working');
           const plannedKg = s.planned_weight_kg != null ? woRound25(s.planned_weight_kg) : null;
           let   actualKg  = plannedKg;
-          if (s.is_joker && inp.actual_weight_kg != null) actualKg = woRound25(inp.actual_weight_kg);
+          if (setType === 'joker' && inp.actual_weight_kg != null) actualKg = woRound25(inp.actual_weight_kg);
           sets.push({
-            slot_id:          slot.slot_id,
-            set_number:       i + 1,
-            set_type:         setType,
+            slot_id:           slot.slot_id,
+            set_number:        i + 1,
+            set_type:          setType,
             planned_weight_kg: plannedKg,
-            actual_weight_kg: actualKg,
-            reps:             s.is_amrap ? (inp.actual_reps ?? null) : (s.reps ?? null),
-            target_rpe:       s.target_rpe ?? null,
-            actual_rpe:       inp.actual_rpe != null ? Number(inp.actual_rpe) : null
+            actual_weight_kg:  actualKg,
+            reps:              inp.actual_reps ?? null,
+            target_rpe:        s.target_rpe ?? null,
+            actual_rpe:        inp.actual_rpe != null ? Number(inp.actual_rpe) : null
           });
         }
       }
@@ -2204,6 +2077,33 @@
     }
 
     function woHandleClick(target) {
+      const badge = target.closest('[data-badge-slot]');
+      if (badge) {
+        woShowBottomSheet(badge.getAttribute('data-badge-slot'), Number(badge.getAttribute('data-badge-set')));
+        return true;
+      }
+
+      const checkBtn = target.closest('[data-check-slot]');
+      if (checkBtn) {
+        const slotId = checkBtn.getAttribute('data-check-slot');
+        const setIdx = Number(checkBtn.getAttribute('data-check-set'));
+        const inp = woSessionInputs[slotId]?.sets[setIdx];
+        if (inp != null) {
+          inp.done = !inp.done;
+          checkBtn.classList.toggle('done', inp.done);
+        }
+        woUpdateFinishBtn();
+        return true;
+      }
+
+      const notesToggle = target.closest('[data-notes-toggle]');
+      if (notesToggle) {
+        const slotId = notesToggle.getAttribute('data-notes-toggle');
+        const area = document.getElementById(`wo-notes-area-${slotId}`);
+        if (area) area.style.display = area.style.display === 'none' ? '' : 'none';
+        return true;
+      }
+
       if (target.id === 'woActivateBtn')        { woShowProgramList(); return true; }
       const activateRow = target.closest('[data-wo-activate]');
       if (activateRow) { woActivateProgram(Number(activateRow.getAttribute('data-wo-activate'))); return true; }
@@ -2221,21 +2121,25 @@
     }
 
     function woHandleInput(input) {
+      if (input.hasAttribute('data-notes-slot')) {
+        const slotId = input.getAttribute('data-notes-slot');
+        if (woSessionInputs[slotId]) woSessionInputs[slotId].notes = input.value;
+        return true;
+      }
       const slotId = input.getAttribute('data-slot');
       const setIdx = input.getAttribute('data-set');
       if (slotId == null || setIdx == null || !woSessionInputs[slotId]) return false;
       const i   = Number(setIdx);
       const inp = woSessionInputs[slotId].sets[i];
       if (!inp) return false;
-      if (input.classList.contains('wo-actual-rpe')) {
+      if (input.classList.contains('wo-actual-rpe-input')) {
         inp.actual_rpe = input.value === '' ? null : Number(input.value);
-        woUpdateE1rmCell(slotId, i);
+        woUpdateE1rmRow(slotId, i);
         return true;
       }
-      if (input.classList.contains('wo-amrap-reps')) {
+      if (input.classList.contains('wo-actual-reps')) {
         inp.actual_reps = input.value === '' ? null : Number(input.value);
-        woUpdateE1rmCell(slotId, i);
-        woUpdateFinishBtn();
+        woUpdateE1rmRow(slotId, i);
         return true;
       }
       if (input.classList.contains('wo-joker-weight')) {
@@ -2246,16 +2150,6 @@
     }
 
     function woHandleChange(input) {
-      const slotId = input.getAttribute('data-slot');
-      const setIdx = input.getAttribute('data-set');
-      if (slotId == null || setIdx == null || !woSessionInputs[slotId]) return false;
-      if (input.classList.contains('wo-joker-skip')) {
-        const i = Number(setIdx);
-        woSessionInputs[slotId].sets[i].joker_skipped = input.checked;
-        document.querySelectorAll(`[data-pair-slot="${slotId}"][data-pair-set="${setIdx}"]`)
-          .forEach(row => row.classList.toggle('wo-dimmed', input.checked));
-        return true;
-      }
       return false;
     }
 
@@ -2270,286 +2164,72 @@
 
         if (woHandleClick(target)) return;
 
-        if (target.id === "programCreateBtn") {
-          openProgramCreateInline();
+        // Programs tab — delete must be checked before select (delete btn is inside select row)
+        const delProgramBtn = target.closest("[data-delete-program]");
+        if (delProgramBtn) {
+          event.stopPropagation();
+          await deleteProgram(Number(delProgramBtn.getAttribute("data-delete-program")));
           return;
         }
 
-        if (target.id === "programCreateCancelBtn") {
-          closeProgramCreateInline();
+        const selProgramRow = target.closest("[data-select-program]");
+        if (selProgramRow) {
+          await selectProgram(Number(selProgramRow.getAttribute("data-select-program")));
           return;
         }
 
-        if (target.id === "programCreateConfirmBtn") {
-          await submitProgramCreateInline();
+        if (target.id === "programNewBtn") { await createNewProgram(); return; }
+        if (target.id === "programImportBtn") { await importProgram(); return; }
+        if (target.id === "programClearBtn") {
+          state.programText = "";
+          const ta = document.getElementById("programTextarea");
+          if (ta) ta.value = "";
+          _acHide();
+          return;
+        }
+        if (target.id === "programActivateBtn") { await activateProgramAndGo(); return; }
+
+        const abandonBtn = target.closest("[id='abandonAndDeleteBtn']");
+        if (abandonBtn) {
+          const pid = Number(abandonBtn.getAttribute("data-abandon-program")) || null;
+          await abandonAndDeleteProgram(pid);
           return;
         }
 
-        const openProgramBtn = target.closest("[data-open-program]");
-        if (openProgramBtn) {
-          await openProgram(Number(openProgramBtn.getAttribute("data-open-program")));
+        const acItem = target.closest("[data-ac-title]");
+        if (acItem) {
+          _acApply(acItem.getAttribute("data-ac-title"));
           return;
         }
-
-        if (target.id === "programBackToListBtn") {
-          state.programDetail = null;
-          state.selectedProgramId = null;
-          state.selectedCycleId = null;
-          state.selectedDayId = null;
-          state.tmBySlotId = {};
-          state.tmLoadingDayId = null;
-          state.tmLoadedDayId = null;
-          state.movementDraft = null;
-          setProgramsView("list");
-          return;
-        }
-
-        if (target.id === "deleteProgramBtn") {
-          await deleteProgram();
-          return;
-        }
-
-        if (target.id === "abandonAndDeleteBtn") {
-          await abandonAndDeleteProgram();
-          return;
-        }
-
-        if (target.id === "addMicrocycleBtn") {
-          await addMicrocycle();
-          return;
-        }
-
-        const openCycleBtn = target.closest("[data-open-cycle]");
-        if (openCycleBtn) {
-          await openCycleAtFirstDay(Number(openCycleBtn.getAttribute("data-open-cycle")));
-          return;
-        }
-
-        const deleteCycleBtn = target.closest("[data-delete-cycle]");
-        if (deleteCycleBtn) {
-          await deleteCycle(Number(deleteCycleBtn.getAttribute("data-delete-cycle")));
-          return;
-        }
-
-        if (target.id === "dayBackToProgramBtn") {
-          state.movementDraft = null;
-          setProgramsView("program");
-          return;
-        }
-
-        const dayTabBtn = target.closest("[data-day-tab]");
-        if (dayTabBtn) {
-          state.selectedDayId = Number(dayTabBtn.getAttribute("data-day-tab"));
-          state.tmBySlotId = {};
-          state.tmLoadingDayId = null;
-          state.tmLoadedDayId = null;
-          state.movementDraft = null;
-          renderProgramsScreens();
-          return;
-        }
-
-        if (target.id === "addDayBtn") {
-          await addDay();
-          return;
-        }
-
-        if (target.id === "deleteDayBtn") {
-          await deleteDay();
-          return;
-        }
-
-        if (target.id === "addMovementBtn") {
-          openMovementBuilder();
-          return;
-        }
-
-        if (target.id === "movementCancelBtn") {
-          state.movementDraft = null;
-          renderProgramsScreens();
-          return;
-        }
-
-        if (target.id === "movementAddSetBtn") {
-          const prevSets = state.movementDraft?.sets;
-          const prevReps = prevSets?.length ? (prevSets[prevSets.length - 1].reps ?? 5) : 5;
-          state.movementDraft?.sets.push({ reps: prevReps, is_amrap: false, is_joker: false, target_rpe: null, joker_jump_pct: null });
-          renderProgramsScreens();
-          return;
-        }
-
-        const removeSetBtn = target.closest("[data-remove-set-index]");
-        if (removeSetBtn && state.movementDraft) {
-          const idx = Number(removeSetBtn.getAttribute("data-remove-set-index"));
-          if (state.movementDraft.sets.length > 1) {
-            state.movementDraft.sets.splice(idx, 1);
-            renderProgramsScreens();
-          }
-          return;
-        }
-
-        const selectExerciseBtn = target.closest("[data-select-exercise]");
-        if (selectExerciseBtn && state.movementDraft) {
-          state.movementDraft.selectedExercise = {
-            id: selectExerciseBtn.getAttribute("data-select-exercise"),
-            title: selectExerciseBtn.getAttribute("data-select-exercise-name")
-          };
-          state.movementDraft.results = [];
-          state.movementDraft.query = "";
-          const sr = document.querySelector(".search-results");
-          if (sr) { sr.innerHTML = ""; sr.style.display = "none"; }
-          renderProgramsScreens();
-          return;
-        }
-
-        if (target.id === "movementSaveBtn") {
-          await saveMovement(Number(target.getAttribute("data-day-id")));
-          return;
-        }
-
-        const deleteSlotBtn = target.closest("[data-delete-slot]");
-        if (deleteSlotBtn) {
-          await deleteSlot(Number(deleteSlotBtn.getAttribute("data-delete-slot")));
-          return;
-        }
-
-        const moveUpBtn = target.closest("[data-move-slot-up]");
-        if (moveUpBtn) {
-          await moveSlot(Number(moveUpBtn.getAttribute("data-move-slot-up")), -1);
-          return;
-        }
-
-        const moveDownBtn = target.closest("[data-move-slot-down]");
-        if (moveDownBtn) {
-          await moveSlot(Number(moveDownBtn.getAttribute("data-move-slot-down")), 1);
-          return;
-        }
-
-        const editTmBtn = target.closest("[data-edit-tm-slot]");
-        if (editTmBtn) {
-          state.tmEditingSlotId = Number(editTmBtn.getAttribute("data-edit-tm-slot"));
-          renderProgramsScreens();
-          return;
-        }
-
       });
 
       document.body.addEventListener("input", (event) => {
-        const input = event.target;
+        if (woHandleInput(event.target)) return;
 
-        if (woHandleInput(input)) return;
-
-        if (input.id === "movementSearchInput" && state.movementDraft) {
-          state.movementDraft.query = input.value;
-          if (state.exerciseSearchDebounceId) clearTimeout(state.exerciseSearchDebounceId);
-          state.exerciseSearchDebounceId = setTimeout(async () => {
-            try {
-              const rows = await fetchExerciseSearch(state.movementDraft?.query || "");
-              if (state.movementDraft) {
-                state.movementDraft.results = rows;
-                renderProgramsScreens();
-                const si = document.getElementById("movementSearchInput");
-                if (si) { si.focus(); const l = si.value.length; si.setSelectionRange(l, l); }
-              }
-            } catch (error) {
-              setStatus(refs.programsStatus, error.message, "error");
-            }
+        if (event.target.id === "programTextarea") {
+          state.programText = event.target.value;
+          clearTimeout(_acDebounce);
+          _acDebounce = setTimeout(() => {
+            const query = _acGetExerciseQuery(event.target);
+            if (query) _acShow(query); else _acHide();
           }, 300);
-          return;
-        }
-
-        const repsIndex = input.getAttribute("data-set-reps-index");
-        if (repsIndex != null && state.movementDraft) {
-          const idx = Number(repsIndex);
-          const value = Number(input.value);
-          state.movementDraft.sets[idx].reps = Number.isFinite(value) && value > 0 ? value : 1;
-          return;
-        }
-
-        const rpeIndex = input.getAttribute("data-set-rpe-index");
-        if (rpeIndex != null && state.movementDraft) {
-          const idx = Number(rpeIndex);
-          const value = Number(input.value);
-          state.movementDraft.sets[idx].target_rpe = Number.isFinite(value) && value >= 1 && value <= 10 ? value : null;
-          return;
-        }
-
-        const jumpIndex = input.getAttribute("data-set-jump-index");
-        if (jumpIndex != null && state.movementDraft) {
-          const idx = Number(jumpIndex);
-          const value = Number(input.value);
-          state.movementDraft.sets[idx].joker_jump_pct = Number.isFinite(value) && value >= 1 && value <= 100 ? value / 100 : null;
-          return;
         }
       });
 
       document.body.addEventListener("change", (event) => {
-        const input = event.target;
-
-        if (woHandleChange(input)) return;
-
-        const amrapIndex = input.getAttribute("data-set-amrap-index");
-        if (amrapIndex != null && state.movementDraft) {
-          state.movementDraft.sets[Number(amrapIndex)].is_amrap = Boolean(input.checked);
-          return;
-        }
-
-        const jokerIndex = input.getAttribute("data-set-joker-index");
-        if (jokerIndex != null && state.movementDraft) {
-          const idx = Number(jokerIndex);
-          const sets = state.movementDraft.sets;
-          sets[idx].is_joker = Boolean(input.checked);
-          if (input.checked && sets[idx].joker_jump_pct == null) {
-            const jokerCount = sets.slice(0, idx).filter(s => s.is_joker).length;
-            sets[idx].joker_jump_pct = jokerCount === 0 ? 0.10 : jokerCount === 1 ? 0.15 : 0.20;
-          }
-          if (!input.checked) sets[idx].joker_jump_pct = null;
-          renderProgramsScreens();
-          return;
-        }
+        woHandleChange(event.target);
       });
 
-      document.body.addEventListener("blur", async (event) => {
-        const target = event.target;
-
-        if (target.id === "programNameInline") {
-          const nextName = target.value.trim();
-          if (!nextName || !state.programDetail || nextName === state.programDetail.name) return;
-          try {
-            await persistProgramName(nextName);
-          } catch (error) {
-            setStatus(refs.programsStatus, error.message, "error");
-          }
-          return;
-        }
-
-        const tmInputSlot = target.getAttribute("data-tm-input-slot");
-        if (tmInputSlot != null) {
-          const slotId = Number(tmInputSlot);
-          const value = Number(target.value);
-          if (Number.isFinite(value) && value > 0) {
-            try {
-              const savedValue = await saveTM(slotId, String(value));
-              state.tmBySlotId[slotId] = savedValue;
-            } catch (error) {
-              setStatus(refs.programsStatus, error.message, "error");
-            }
-          }
-          state.tmEditingSlotId = null;
-          renderProgramsScreens();
-        }
-      }, true);
-
       document.body.addEventListener("keydown", async (event) => {
-        if (event.key === "Enter" && event.target?.id === "newProgramNameInline") {
-          event.preventDefault();
-          await submitProgramCreateInline();
+        if (event.target.id === "programTextarea" && event.key === "Escape") {
+          _acHide();
           return;
         }
 
-        const row = event.target.closest("[data-open-program]");
+        const row = event.target.closest("[data-select-program]");
         if (row && (event.key === "Enter" || event.key === " ")) {
           event.preventDefault();
-          await openProgram(Number(row.getAttribute("data-open-program")));
+          await selectProgram(Number(row.getAttribute("data-select-program")));
         }
       });
     }

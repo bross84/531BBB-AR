@@ -15,6 +15,7 @@ load_dotenv()
 
 from database import get_db, get_rpe_percentage, init_db
 import hevy_client
+import program_parser
 from wave_math import bbb_weight, epley, joker_qualifies, joker_weight, round_weight, session_e1rm, working_weight
 
 logger = logging.getLogger(__name__)
@@ -50,6 +51,11 @@ class SlotTrainingMaxInput(BaseModel):
     value_kg: float = Field(gt=0)
 
 
+class SlotWmPctInput(BaseModel):
+    slot_id: int = Field(ge=1)
+    value: float = Field(ge=50, le=100)
+
+
 class ProgramInput(BaseModel):
     name: str
     total_weeks: int = Field(ge=1)
@@ -79,6 +85,11 @@ class SlotInput(BaseModel):
     slot_order: int = 0
     wave_params: dict[str, Any] | None = None
     target_rpe: float | None = None
+    source_params: dict[str, Any] | None = None
+
+
+class ParseProgramInput(BaseModel):
+    text: str
 
 
 class ActiveBlockStartInput(BaseModel):
@@ -136,6 +147,7 @@ def _slot_response(row: dict[str, Any]) -> dict[str, Any]:
         "slot_order": row["slot_order"],
         "wave_params": _parse_wave_params(row["wave_params"]),
         "target_rpe": row["target_rpe"],
+        "source_params": _parse_wave_params(row.get("source_params")),
     }
 
 
@@ -163,28 +175,51 @@ def _fetch_program_tree(program_id: int) -> dict[str, Any]:
                 (program_id,),
             ).fetchall()
         ]
-        cycles = [
-            {
-                **dict(row),
-                "days": [],
-            }
-            for row in conn.execute(
-                """
-                SELECT id, program_id, cycle_number, label
-                FROM blocks
-                WHERE program_id = ?
-                ORDER BY cycle_number ASC, id ASC
-                """,
-                (program_id,),
-            ).fetchall()
+
+        # Top-level blocks (new schema level)
+        block_rows = conn.execute(
+            """
+            SELECT id, program_id, block_number, label
+            FROM blocks
+            WHERE program_id = ?
+            ORDER BY block_number ASC, id ASC
+            """,
+            (program_id,),
+        ).fetchall()
+        blocks: list[dict[str, Any]] = [
+            {**dict(row), "microcycles": []}
+            for row in block_rows
         ]
-        cycle_map = {cycle["id"]: cycle for cycle in cycles}
+        block_map = {blk["id"]: blk for blk in blocks}
+
+        # Microcycles — may be linked to a block (block_id) or unlinked (legacy)
+        mc_rows = conn.execute(
+            """
+            SELECT id, program_id, block_id, cycle_number, label
+            FROM microcycles
+            WHERE program_id = ?
+            ORDER BY cycle_number ASC, id ASC
+            """,
+            (program_id,),
+        ).fetchall()
+        orphan_microcycles: list[dict[str, Any]] = []
+        mc_map: dict[int, dict[str, Any]] = {}
+        for row in mc_rows:
+            mc = {**dict(row), "days": []}
+            mc_map[mc["id"]] = mc
+            parent_block = block_map.get(mc["block_id"]) if mc["block_id"] is not None else None
+            if parent_block is not None:
+                parent_block["microcycles"].append(mc)
+            else:
+                orphan_microcycles.append(mc)
+
+        # Days — block_id here references microcycles.id
         day_rows = conn.execute(
             """
             SELECT id, block_id, day_number, label
             FROM days
             WHERE block_id IN (
-                SELECT id FROM blocks WHERE program_id = ?
+                SELECT id FROM microcycles WHERE program_id = ?
             )
             ORDER BY day_number ASC, id ASC
             """,
@@ -192,22 +227,19 @@ def _fetch_program_tree(program_id: int) -> dict[str, Any]:
         ).fetchall()
         day_map: dict[int, dict[str, Any]] = {}
         for row in day_rows:
-            day = {
-                **dict(row),
-                "slots": [],
-            }
+            day = {**dict(row), "slots": []}
             day_map[day["id"]] = day
-            cycle_map[day["block_id"]]["days"].append(day)
+            mc_map[day["block_id"]]["days"].append(day)
 
         slot_rows = conn.execute(
             """
             SELECT id, day_id, tier_id, hevy_exercise_id, hevy_exercise_name,
-                   slot_order, wave_params, target_rpe
+                   slot_order, wave_params, target_rpe, source_params
             FROM exercise_slots
             WHERE day_id IN (
                 SELECT d.id
                 FROM days d
-                JOIN blocks b ON b.id = d.block_id
+                JOIN microcycles b ON b.id = d.block_id
                 WHERE b.program_id = ?
             )
             ORDER BY slot_order ASC, id ASC
@@ -218,11 +250,15 @@ def _fetch_program_tree(program_id: int) -> dict[str, Any]:
             slot = _slot_response(dict(row))
             day_map[slot["day_id"]]["slots"].append(slot)
 
-    return {
+    result: dict[str, Any] = {
         **program,
         "tiers": tiers,
-        "cycles": cycles,
+        "blocks": blocks,
     }
+    if orphan_microcycles:
+        # Legacy microcycles with no parent block — surface them separately
+        result["microcycles"] = orphan_microcycles
+    return result
 
 
 def _ensure_program_exists(conn, program_id: int) -> None:
@@ -232,7 +268,7 @@ def _ensure_program_exists(conn, program_id: int) -> None:
 
 
 def _ensure_block_exists(conn, block_id: int) -> None:
-    row = conn.execute("SELECT 1 FROM blocks WHERE id = ?", (block_id,)).fetchone()
+    row = conn.execute("SELECT 1 FROM microcycles WHERE id = ?", (block_id,)).fetchone()
     if row is None:
         raise HTTPException(status_code=404, detail="Cycle not found.")
 
@@ -257,7 +293,7 @@ def _ensure_slot_exists(conn, slot_id: int) -> dict[str, Any]:
         conn,
         """
         SELECT id, day_id, tier_id, hevy_exercise_id, hevy_exercise_name,
-               slot_order, wave_params, target_rpe
+               slot_order, wave_params, target_rpe, source_params
         FROM exercise_slots
         WHERE id = ?
         """,
@@ -271,7 +307,7 @@ def _day_program_id(conn, day_id: int) -> int:
         """
         SELECT b.program_id
         FROM days d
-        JOIN blocks b ON b.id = d.block_id
+        JOIN microcycles b ON b.id = d.block_id
         WHERE d.id = ?
         """,
         (day_id,),
@@ -348,12 +384,57 @@ def _slot_in_program(conn, slot_id: int, program_id: int) -> dict[str, Any] | No
         SELECT s.id, s.hevy_exercise_id, s.hevy_exercise_name
         FROM exercise_slots s
         JOIN days d ON d.id = s.day_id
-        JOIN blocks b ON b.id = d.block_id
+        JOIN microcycles b ON b.id = d.block_id
         WHERE s.id = ? AND b.program_id = ?
         """,
         (slot_id, program_id),
     ).fetchone()
     return dict(row) if row is not None else None
+
+
+def _load_api_key(conn) -> str | None:
+    """Read and decrypt the Hevy API key using the existing DB connection."""
+    row = conn.execute(
+        "SELECT value FROM app_settings WHERE key = 'hevy_api_key'"
+    ).fetchone()
+    if row is None:
+        return None
+    try:
+        return hevy_client._decrypt(row["value"])
+    except Exception:
+        return None
+
+
+def _resolve_e1rm(conn, hevy_exercise_id: str) -> float | None:
+    """
+    Return the best known e1RM for the given Hevy exercise ID.
+
+    Lookup order:
+    1. Most recent entry in e1rm_log (any active block) joined via exercise_slots.
+    2. Hevy workout history via HevyClient — skipped if no API key is stored.
+
+    Does not write to e1rm_log: the schema CHECK constraint only allows
+    ('amrap','joker_avg','manual') and the function lacks the active_block_id /
+    exercise_slot_id FKs required for a row insert.
+    """
+    row = conn.execute(
+        """
+        SELECT el.e1rm_kg
+        FROM e1rm_log el
+        JOIN exercise_slots es ON es.id = el.exercise_slot_id
+        WHERE es.hevy_exercise_id = ?
+        ORDER BY el.logged_at DESC, el.id DESC
+        LIMIT 1
+        """,
+        (hevy_exercise_id,),
+    ).fetchone()
+    if row is not None:
+        return float(row["e1rm_kg"])
+
+    api_key = _load_api_key(conn)
+    if not api_key:
+        return None
+    return hevy_client.HevyClient(api_key).best_e1rm_from_hevy(hevy_exercise_id)
 
 
 def _session_slots_for_active_block(conn, state: dict[str, Any]) -> list[dict[str, Any]]:
@@ -368,11 +449,12 @@ def _session_slots_for_active_block(conn, state: dict[str, Any]) -> list[dict[st
                    s.hevy_exercise_name AS exercise_name,
                    s.wave_params,
                    s.target_rpe,
+                   s.source_params,
                    s.slot_order
             FROM exercise_slots s
             JOIN tiers t ON t.id = s.tier_id
             JOIN days d ON d.id = s.day_id
-            JOIN blocks b ON b.id = d.block_id
+            JOIN microcycles b ON b.id = d.block_id
             WHERE b.program_id = ?
               AND b.cycle_number = ?
               AND d.day_number = ?
@@ -420,6 +502,34 @@ def save_training_max_setting(data: SlotTrainingMaxInput):
     return {"slot_id": data.slot_id, "value_kg": data.value_kg}
 
 
+@app.post("/settings/wm-pct")
+def save_wm_pct_setting(data: SlotWmPctInput):
+    setting_key = f"wm_pct_{data.slot_id}"
+    with get_db() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)",
+            (setting_key, str(data.value)),
+        )
+    return {"slot_id": data.slot_id, "value": data.value}
+
+
+@app.get("/settings/wm-pct/{slot_id}")
+def get_wm_pct_setting(slot_id: int):
+    setting_key = f"wm_pct_{slot_id}"
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT value FROM app_settings WHERE key = ?",
+            (setting_key,),
+        ).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="WM% not set.")
+    try:
+        value = float(row["value"])
+    except (TypeError, ValueError) as error:
+        raise HTTPException(status_code=500, detail="Stored WM% is invalid.") from error
+    return {"slot_id": slot_id, "value": value}
+
+
 @app.get("/settings/tm/{slot_id}")
 def get_training_max_setting(slot_id: int):
     setting_key = f"tm_{slot_id}"
@@ -438,7 +548,176 @@ def get_training_max_setting(slot_id: int):
     return {"slot_id": slot_id, "value_kg": value_kg}
 
 
+@app.post("/programs/parse")
+def parse_program_text(data: ParseProgramInput):
+    return program_parser.parse_program(data.text)
+
+
 # ── Programs ───────────────────────────────────────────────────────────────────
+
+@app.post("/programs/{program_id}/import")
+def import_program(program_id: int, data: ParseProgramInput):
+    parsed = program_parser.parse_program(data.text)
+    if parsed["errors"]:
+        raise HTTPException(status_code=422, detail=parsed["errors"])
+
+    parsed_blocks = parsed["blocks"]
+    import_errors: list[dict[str, Any]] = []
+    block_count = 0
+    mc_count = 0
+    day_count = 0
+    slot_count = 0
+
+    with get_db() as conn:
+        _ensure_program_exists(conn, program_id)
+
+        # Block reimport if there is an active block for this program.
+        active_block = conn.execute(
+            "SELECT id FROM active_blocks WHERE program_id = ? AND status = 'active' LIMIT 1",
+            (program_id,),
+        ).fetchone()
+        if active_block:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot reimport a program with an active block — abandon the active block first.",
+            )
+
+        # Wipe existing program data in FK-safe order before reinserting.
+        conn.execute(
+            """
+            DELETE FROM exercise_slots
+            WHERE day_id IN (
+                SELECT id FROM days
+                WHERE block_id IN (
+                    SELECT id FROM microcycles
+                    WHERE block_id IN (
+                        SELECT id FROM blocks WHERE program_id = ?
+                    )
+                )
+            )
+            """,
+            (program_id,),
+        )
+        conn.execute(
+            """
+            DELETE FROM days
+            WHERE block_id IN (
+                SELECT id FROM microcycles
+                WHERE block_id IN (
+                    SELECT id FROM blocks WHERE program_id = ?
+                )
+            )
+            """,
+            (program_id,),
+        )
+        conn.execute(
+            """
+            DELETE FROM microcycles
+            WHERE block_id IN (
+                SELECT id FROM blocks WHERE program_id = ?
+            )
+            """,
+            (program_id,),
+        )
+        conn.execute("DELETE FROM blocks WHERE program_id = ?", (program_id,))
+        conn.execute("DELETE FROM tiers WHERE program_id = ?", (program_id,))
+
+        cache_rows = conn.execute(
+            "SELECT id, title FROM hevy_exercise_cache"
+        ).fetchall()
+        exercise_lookup: dict[str, str] = {row["title"].lower(): row["id"] for row in cache_rows}
+
+        # Collect all sources so tiers can be found or created before slot inserts.
+        all_sources: set[str] = set()
+        for blk in parsed_blocks:
+            for mc in blk["microcycles"]:
+                for day in mc["days"]:
+                    for slot in day["slots"]:
+                        all_sources.add((slot.get("source_params") or {}).get("source", "free"))
+
+        # Tiers for imported programs use behaviour='free' (compatible with both old and new
+        # DB CHECK constraints). source_params on each slot is the real source of truth.
+        source_to_tier: dict[str, int] = {}
+        for idx, source in enumerate(sorted(all_sources)):
+            tier_name = source.upper()
+            existing = conn.execute(
+                "SELECT id FROM tiers WHERE program_id = ? AND name = ? LIMIT 1",
+                (program_id, tier_name),
+            ).fetchone()
+            if existing:
+                source_to_tier[source] = existing["id"]
+            else:
+                cur = conn.execute(
+                    "INSERT INTO tiers (program_id, name, behaviour, display_order) VALUES (?, ?, 'free', ?)",
+                    (program_id, tier_name, idx),
+                )
+                source_to_tier[source] = cur.lastrowid
+
+        for blk in parsed_blocks:
+            blk_cur = conn.execute(
+                "INSERT INTO blocks (program_id, block_number, label) VALUES (?, ?, ?)",
+                (program_id, blk["block_number"], blk.get("label")),
+            )
+            blk_id = blk_cur.lastrowid
+            block_count += 1
+
+            for mc in blk["microcycles"]:
+                mc_cur = conn.execute(
+                    "INSERT INTO microcycles (program_id, block_id, cycle_number, label) VALUES (?, ?, ?, ?)",
+                    (program_id, blk_id, mc["cycle_number"], mc.get("label")),
+                )
+                mc_id = mc_cur.lastrowid
+                mc_count += 1
+
+                for day in mc["days"]:
+                    day_cur = conn.execute(
+                        "INSERT INTO days (block_id, day_number, label) VALUES (?, ?, ?)",
+                        (mc_id, day["day_number"], day.get("label")),
+                    )
+                    day_id = day_cur.lastrowid
+                    day_count += 1
+
+                    for slot in day["slots"]:
+                        sp = slot.get("source_params") or {}
+                        source = sp.get("source", "free")
+                        tier_id = source_to_tier[source]
+
+                        exercise_name = slot["exercise_name"]
+                        hevy_exercise_id = exercise_lookup.get(exercise_name.lower(), "")
+                        if not hevy_exercise_id:
+                            import_errors.append({
+                                "exercise": exercise_name,
+                                "message": f"Exercise not found in cache: {exercise_name!r}",
+                            })
+
+                        conn.execute(
+                            """
+                            INSERT INTO exercise_slots (
+                                day_id, tier_id, hevy_exercise_id, hevy_exercise_name,
+                                slot_order, wave_params, target_rpe, source_params
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                            """,
+                            (
+                                day_id,
+                                tier_id,
+                                hevy_exercise_id,
+                                exercise_name,
+                                slot["slot_order"],
+                                json.dumps({"sets": slot["sets"]}),
+                                slot.get("target_rpe"),
+                                json.dumps(sp) if sp else None,
+                            ),
+                        )
+                        slot_count += 1
+
+    return {
+        "imported": True,
+        "blocks": block_count,
+        "microcycles": mc_count,
+        "days": day_count,
+        "slots": slot_count,
+        "errors": import_errors,
+    }
 
 @app.get("/programs")
 def list_programs():
@@ -541,7 +820,7 @@ def delete_program(program_id: int):
             WHERE day_id IN (
                 SELECT d.id
                 FROM days d
-                JOIN blocks b ON b.id = d.block_id
+                JOIN microcycles b ON b.id = d.block_id
                 WHERE b.program_id = ?
             )
             """,
@@ -551,11 +830,12 @@ def delete_program(program_id: int):
             """
             DELETE FROM days
             WHERE block_id IN (
-                SELECT id FROM blocks WHERE program_id = ?
+                SELECT id FROM microcycles WHERE program_id = ?
             )
             """,
             (program_id,),
         )
+        conn.execute("DELETE FROM microcycles WHERE program_id = ?", (program_id,))
         conn.execute("DELETE FROM blocks WHERE program_id = ?", (program_id,))
         conn.execute("DELETE FROM tiers WHERE program_id = ?", (program_id,))
         conn.execute("DELETE FROM programs WHERE id = ?", (program_id,))
@@ -631,7 +911,7 @@ def create_cycle(program_id: int, data: CycleInput):
         _ensure_program_exists(conn, program_id)
         cursor = conn.execute(
             """
-            INSERT INTO blocks (program_id, cycle_number, label)
+            INSERT INTO microcycles (program_id, cycle_number, label)
             VALUES (?, ?, ?)
             """,
             (program_id, data.cycle_number, data.label),
@@ -640,7 +920,7 @@ def create_cycle(program_id: int, data: CycleInput):
         row = conn.execute(
             """
             SELECT id, program_id, cycle_number, label
-            FROM blocks
+            FROM microcycles
             WHERE id = ?
             """,
             (block_id,),
@@ -666,7 +946,7 @@ def delete_cycle(cycle_id: int):
             (cycle_id,),
         )
         conn.execute(
-            "DELETE FROM blocks WHERE id = ?",
+            "DELETE FROM microcycles WHERE id = ?",
             (cycle_id,),
         )
     return {"deleted": True}
@@ -735,9 +1015,9 @@ def create_slot(day_id: int, data: SlotInput):
             """
             INSERT INTO exercise_slots (
                 day_id, tier_id, hevy_exercise_id, hevy_exercise_name,
-                slot_order, wave_params, target_rpe
+                slot_order, wave_params, target_rpe, source_params
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 day_id,
@@ -747,13 +1027,14 @@ def create_slot(day_id: int, data: SlotInput):
                 data.slot_order,
                 _serialize_wave_params(data.wave_params),
                 data.target_rpe,
+                _serialize_wave_params(data.source_params),
             ),
         )
         slot_id = cursor.lastrowid
         row = conn.execute(
             """
             SELECT id, day_id, tier_id, hevy_exercise_id, hevy_exercise_name,
-                   slot_order, wave_params, target_rpe
+                   slot_order, wave_params, target_rpe, source_params
             FROM exercise_slots
             WHERE id = ?
             """,
@@ -778,7 +1059,7 @@ def update_slot(slot_id: int, data: SlotInput):
             """
             UPDATE exercise_slots
             SET tier_id = ?, hevy_exercise_id = ?, hevy_exercise_name = ?,
-                slot_order = ?, wave_params = ?, target_rpe = ?
+                slot_order = ?, wave_params = ?, target_rpe = ?, source_params = ?
             WHERE id = ?
             """,
             (
@@ -788,13 +1069,14 @@ def update_slot(slot_id: int, data: SlotInput):
                 data.slot_order,
                 _serialize_wave_params(data.wave_params),
                 data.target_rpe,
+                _serialize_wave_params(data.source_params),
                 slot_id,
             ),
         )
         row = conn.execute(
             """
             SELECT id, day_id, tier_id, hevy_exercise_id, hevy_exercise_name,
-                   slot_order, wave_params, target_rpe
+                   slot_order, wave_params, target_rpe, source_params
             FROM exercise_slots
             WHERE id = ?
             """,
@@ -857,7 +1139,7 @@ def advance_active_block(active_block_id: int):
             """
             SELECT COUNT(*) AS day_count
             FROM days d
-            JOIN blocks b ON b.id = d.block_id
+            JOIN microcycles b ON b.id = d.block_id
             WHERE b.program_id = ? AND b.cycle_number = ?
             """,
             (state["program_id"], state["current_cycle"]),
@@ -882,7 +1164,7 @@ def advance_active_block(active_block_id: int):
             )
         else:
             last_cycle_row = conn.execute(
-                "SELECT MAX(cycle_number) AS max_cycle FROM blocks WHERE program_id = ?",
+                "SELECT MAX(cycle_number) AS max_cycle FROM microcycles WHERE program_id = ?",
                 (state["program_id"],),
             ).fetchone()
             max_cycle = last_cycle_row["max_cycle"]
@@ -898,7 +1180,7 @@ def advance_active_block(active_block_id: int):
                     """
                     SELECT COUNT(*) AS day_count
                     FROM days d
-                    JOIN blocks b ON b.id = d.block_id
+                    JOIN microcycles b ON b.id = d.block_id
                     WHERE b.program_id = ? AND b.cycle_number = ?
                     """,
                     (state["program_id"], next_cycle),
@@ -1000,37 +1282,79 @@ def get_active_block_session(active_block_id: int):
             is_amrap = any(set_row["is_amrap"] for set_row in parsed_sets)
             jokers_enabled = any(set_row["is_joker"] for set_row in parsed_sets)
 
-            if row["tier_behaviour"] == "percentage":
-                e1rm_row = conn.execute(
+            slot_source_params = _parse_wave_params(row.get("source_params")) or {}
+            source = slot_source_params.get("source")  # "tm", "e1rm", "ddp", "free", or None
+
+            if source == "tm":
+                e1rm_kg = _resolve_e1rm(conn, row["hevy_exercise_id"])
+                if e1rm_kg is None:
+                    e1rm_kg = _setting_float_or_none(conn, f"tm_{row['slot_id']}")
+                sp_wm_pct = slot_source_params.get("wm_pct")
+                try:
+                    wm_pct = float(sp_wm_pct) if sp_wm_pct is not None else None
+                except (TypeError, ValueError):
+                    wm_pct = None
+                if wm_pct is None:
+                    raw_setting = _setting_float_or_none(conn, f"wm_pct_{row['slot_id']}")
+                    wm_pct = raw_setting / 100 if raw_setting is not None else 0.90
+                baseline_for_wave = e1rm_kg * wm_pct if e1rm_kg is not None else None
+
+            elif source == "e1rm":
+                baseline_for_wave = _resolve_e1rm(conn, row["hevy_exercise_id"])
+
+            elif source == "ddp":
+                ddp_row = conn.execute(
                     """
-                    SELECT e1rm_kg
-                    FROM e1rm_log
-                    WHERE active_block_id = ? AND exercise_slot_id = ?
-                    ORDER BY logged_at DESC, id DESC
-                    LIMIT 1
+                    SELECT actual_weight_kg FROM session_log
+                    WHERE exercise_slot_id = ?
+                      AND set_type != 'joker'
+                      AND actual_weight_kg IS NOT NULL
+                    ORDER BY logged_at DESC, id DESC LIMIT 1
                     """,
-                    (active_block_id, row["slot_id"]),
+                    (row["slot_id"],),
                 ).fetchone()
-                baseline_for_wave = (
-                    float(e1rm_row["e1rm_kg"])
-                    if e1rm_row is not None
-                    else _setting_float_or_none(conn, f"tm_{row['slot_id']}")
-                )
-                if baseline_for_wave is not None:
-                    try:
-                        first_set_weight_kg = float(
-                            working_weight(baseline_for_wave, week_number, wave_params)
-                        )
-                    except (KeyError, IndexError, TypeError, ValueError):
-                        first_set_weight_kg = None
-            elif row["tier_behaviour"] in {"fixed", "progression"}:
-                base_weight = _wave_param_number(
-                    wave_params,
-                    ["weight_kg", "fixed_weight_kg", "progression_weight_kg", "current_weight_kg"],
-                )
-                if base_weight is not None:
-                    baseline_for_wave = float(base_weight)
-                    first_set_weight_kg = float(round_weight(base_weight))
+                baseline_for_wave = float(ddp_row["actual_weight_kg"]) if ddp_row is not None else None
+
+            elif source == "free":
+                baseline_for_wave = None
+
+            else:
+                # Legacy tier_behaviour fallback for programs built before source_params
+                if row["tier_behaviour"] == "percentage":
+                    e1rm_row = conn.execute(
+                        """
+                        SELECT e1rm_kg FROM e1rm_log
+                        WHERE active_block_id = ? AND exercise_slot_id = ?
+                        ORDER BY logged_at DESC, id DESC LIMIT 1
+                        """,
+                        (active_block_id, row["slot_id"]),
+                    ).fetchone()
+                    e1rm_kg = (
+                        float(e1rm_row["e1rm_kg"])
+                        if e1rm_row is not None
+                        else _setting_float_or_none(conn, f"tm_{row['slot_id']}")
+                    )
+                    wm_pct_row = conn.execute(
+                        "SELECT value FROM app_settings WHERE key = ?",
+                        (f"wm_pct_{row['slot_id']}",),
+                    ).fetchone()
+                    wm_pct = float(wm_pct_row["value"]) / 100 if wm_pct_row else 0.90
+                    baseline_for_wave = e1rm_kg * wm_pct if e1rm_kg is not None else None
+                    if baseline_for_wave is not None:
+                        try:
+                            first_set_weight_kg = float(
+                                working_weight(baseline_for_wave, week_number, wave_params)
+                            )
+                        except (KeyError, IndexError, TypeError, ValueError):
+                            first_set_weight_kg = None
+                elif row["tier_behaviour"] in {"fixed", "progression"}:
+                    base_weight = _wave_param_number(
+                        wave_params,
+                        ["weight_kg", "fixed_weight_kg", "progression_weight_kg", "current_weight_kg"],
+                    )
+                    if base_weight is not None:
+                        baseline_for_wave = float(base_weight)
+                        first_set_weight_kg = float(round_weight(base_weight))
 
             if "bbb_percentages" in wave_params and baseline_for_wave is not None:
                 try:
@@ -1038,7 +1362,9 @@ def get_active_block_session(active_block_id: int):
                 except (KeyError, IndexError, TypeError, ValueError):
                     bbb_weight_kg = None
 
-            # Second pass: fill planned_weight_kg per set now that first_set_weight_kg is known.
+            # Second pass: fill planned_weight_kg per set.
+            # New source-params path: each set uses baseline * its own rpe_percentage.
+            # Legacy tier_behaviour path: all non-joker sets share first_set_weight_kg.
             prev_kg: float | None = first_set_weight_kg
             for s in parsed_sets:
                 if s["is_joker"]:
@@ -1050,9 +1376,21 @@ def get_active_block_session(active_block_id: int):
                             s["planned_weight_kg"] = None
                     else:
                         s["planned_weight_kg"] = None
+                elif source in {"tm", "e1rm", "ddp"}:
+                    rpe_pct = s.get("rpe_percentage")
+                    if baseline_for_wave is not None and rpe_pct is not None:
+                        s["planned_weight_kg"] = float(round_weight(baseline_for_wave * rpe_pct))
+                    else:
+                        s["planned_weight_kg"] = None
                 else:
                     s["planned_weight_kg"] = first_set_weight_kg
                 prev_kg = s["planned_weight_kg"]
+
+            if source in {"tm", "e1rm", "ddp", "free"}:
+                first_set_weight_kg = next(
+                    (s["planned_weight_kg"] for s in parsed_sets if not s["is_joker"]),
+                    None,
+                )
 
             slots.append(
                 {
@@ -1315,24 +1653,8 @@ def sync_exercises():
 
 @app.get("/exercises/{hevy_exercise_id}/e1rm")
 def get_exercise_e1rm(hevy_exercise_id: str):
-    # Step 1: local lookup via e1rm_log joined to exercise_slots
     with get_db() as conn:
-        row = conn.execute(
-            """
-            SELECT el.e1rm_kg
-            FROM e1rm_log el
-            JOIN exercise_slots es ON es.id = el.exercise_slot_id
-            WHERE es.hevy_exercise_id = ?
-            ORDER BY el.logged_at DESC, el.id DESC
-            LIMIT 1
-            """,
-            (hevy_exercise_id,),
-        ).fetchone()
-    if row is not None:
-        return {"source": "local", "e1rm_kg": float(row["e1rm_kg"])}
-
-    # Step 2: Hevy fallback
-    best = hevy_client.HevyClient().best_e1rm_from_hevy(hevy_exercise_id)
-    if best is None:
+        e1rm_kg = _resolve_e1rm(conn, hevy_exercise_id)
+    if e1rm_kg is None:
         raise HTTPException(status_code=404, detail="No e1RM data found.")
-    return {"source": "hevy", "e1rm_kg": best}
+    return {"e1rm_kg": e1rm_kg}

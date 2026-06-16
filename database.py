@@ -12,6 +12,13 @@ def get_db() -> sqlite3.Connection:
 
 def init_db() -> None:
     with get_db() as conn:
+        # Rename old blocks table (microcycle level) before executescript creates the new blocks table.
+        # executescript issues an implicit COMMIT, which also commits this rename.
+        try:
+            conn.execute("ALTER TABLE blocks RENAME TO microcycles")
+        except Exception:
+            pass  # already renamed, or new DB (table doesn't exist yet)
+
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS programs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -25,20 +32,28 @@ def init_db() -> None:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 program_id INTEGER NOT NULL REFERENCES programs(id),
                 name TEXT NOT NULL,
-                behaviour TEXT NOT NULL CHECK(behaviour IN ('percentage','fixed','progression','free')),
+                behaviour TEXT NOT NULL CHECK(behaviour IN ('tm','e1rm','ddp','free')),
                 display_order INTEGER NOT NULL DEFAULT 0
             );
 
             CREATE TABLE IF NOT EXISTS blocks (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 program_id INTEGER NOT NULL REFERENCES programs(id),
+                block_number INTEGER NOT NULL,
+                label TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS microcycles (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                program_id INTEGER NOT NULL REFERENCES programs(id),
+                block_id INTEGER REFERENCES blocks(id),
                 cycle_number INTEGER NOT NULL,
                 label TEXT
             );
 
             CREATE TABLE IF NOT EXISTS days (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                block_id INTEGER NOT NULL REFERENCES blocks(id),
+                block_id INTEGER NOT NULL REFERENCES microcycles(id),
                 day_number INTEGER NOT NULL,
                 label TEXT
             );
@@ -51,7 +66,8 @@ def init_db() -> None:
                 hevy_exercise_name TEXT NOT NULL,
                 slot_order INTEGER NOT NULL DEFAULT 0,
                 wave_params TEXT,
-                target_rpe REAL
+                target_rpe REAL,
+                source_params TEXT
             );
 
             CREATE TABLE IF NOT EXISTS active_blocks (
@@ -110,6 +126,19 @@ def init_db() -> None:
                 PRIMARY KEY (rpe, reps)
             );
         """)
+
+        try:
+            conn.execute("ALTER TABLE exercise_slots ADD COLUMN source_params TEXT")
+        except Exception:
+            pass  # column already exists
+
+        try:
+            conn.execute(
+                "ALTER TABLE microcycles ADD COLUMN block_id INTEGER REFERENCES blocks(id)"
+            )
+        except Exception:
+            pass  # column already exists or table didn't exist yet
+
         _seed_rpe_chart(conn)
 
 

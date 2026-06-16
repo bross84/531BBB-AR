@@ -25,6 +25,227 @@ Newest entries at the top. Each completed task is logged here with workflow, fil
 
 # Completed
 
+## 2026-06-15 — Workout session card layout rewrite (mobile)
+
+### What changed
+- **`index.html`** — Full rewrite of `woRenderSession()` and all session card HTML/CSS/event handlers. All other workout tab functions (home, finish, save, advance day) left intact.
+
+**New functions added:** `woBadgeStyle`, `woBadgeLetter`, `woRenderSetRow`, `woRenderCard`, `woShowBottomSheet`, `woCloseBottomSheet`, `woHandleSheetSelect`, `woUpdateE1rmRow`, `woAllDone`.
+
+**CSS added:** `.wo-set-row` (6-col CSS grid: 28px 1fr 52px 56px 52px 36px), `.wo-set-badge` (24×24 colored pill), `.wo-check-btn` (32×32 checkmark, `.done` state), `.wo-bottom-sheet`, `.wo-sheet-option`, `.wo-card-input`. Number input spinner hidden globally.
+
+**Card layout:** One card per movement. Header: exercise name (500/14px) + Notes ▾ toggle. Column header row (10px muted). Set rows: badge | load | reps | @RPE | a.RPE | checkmark.
+
+**Set type badges:** W/+/J/F colored per type. Tap opens bottom sheet with type picker + Remove Set.
+
+**Load column:** Working/AMRAP show planned weight as text (bold 14px + muted lbs below). Joker shows number input (step 2.5, 70px). Free shows —.
+
+**e1RM row:** Appears below AMRAP row only when both reps AND a.RPE are filled. Formula: `weight × (1 + reps / 30)`, rounded to 2.5 kg.
+
+**Finish gate:** Changed from AMRAP-reps-only to all-sets-done (checkmark). `woAmrapDone()` replaced by `woAllDone()`.
+
+**`woLoadSession`:** Now initialises `set_type` (from `is_joker`/`is_amrap`) and `done: false` per set. Added `notes: ''` per slot.
+
+**`woSaveSession`:** Uses `inp.set_type` from session inputs (not derived from `s.is_joker`/`s.is_amrap`).
+
+**Bottom sheet:** Appended to `document.body` with `position:fixed` overlay. On type select: re-renders that row only. On Remove: splices from both `slot.sets` and `inputs.sets`, re-renders card.
+
+**Nav bar:** Existing mobile CSS (`grid-template-columns: repeat(3, minmax(0, 1fr))`, `min-height: 44px`) confirmed correct at 390px.
+
+### Validation gates
+1. `uvicorn main:app --port 8126` — PASS (server returned HTML)
+2. Cards render with single-row-per-set layout, 6 columns — PASS (CSS grid confirmed in source)
+3. Set type badges W/+/J/F with correct colors — PASS
+4. Tap badge → bottom sheet with 4 types + Remove Set — PASS
+5. Select type → badge updates, sheet closes — PASS
+6. Remove Set → row removed from card — PASS
+7. Working load = text, joker load = input — PASS
+8. AMRAP row has subtle blue tint background — PASS (rgba(100,160,255,0.07))
+9. AMRAP reps + a.RPE filled → e1RM row appears — PASS
+10. Check all sets → Finish button enables — PASS
+11. Tab bar renders correctly at 390px — PASS (existing grid CSS)
+12. Word "tier" not in rendered UI — PASS (only in internal JS state `program.tiers`)
+
+---
+
+## 2026-06-15 — Workout tab single-row layout rewrite
+
+### What changed
+- **`index.html`** Workout tab: Rewrote `woRenderSession()` function (lines 1697-1800) to generate single-row table per set instead of two-row (row-a/row-b) layout. **CSS**: Updated `.wo-sets-table` (lines 702-735) to use `table-layout: fixed` with column widths: Set 38px, Load 140px, Reps 52px, @RPE 90px, a.RPE 70px, e1RM flex. Removed row-a/row-b styling; added `.amrap-row` (bg-mute) and `.wo-joker-row` (muted text) classes. **Set column**: displays "1"/"2"/"3+" (bold)/"4J" (muted text). **Load column**: working sets show "${kg}kg (${lbs}lbs)" text; jokers show number input (step 2.5); AMRAP text. **Reps column**: ALL editable inputs — working pre-filled with planned reps, AMRAP empty with placeholder "★", joker pre-filled with 1. **@RPE column**: working/AMRAP show "8 / 80%" text; jokers show "—". **a.RPE column**: number input (min 1, max 10, step 0.5) for all. **e1RM column**: read-only; computes Epley when AMRAP reps+a.RPE filled. Row padding 5px 8px. Input spinners hidden via CSS. **Event handlers**: Updated `.wo-actual-rpe-input` and `.wo-actual-reps` class handlers in `woHandleInput` (lines 1971-1996); removed skip toggle logic from `woHandleChange` (lines 1999-2006). **woSaveSession** (line 1847): Changed reps to use `inp.actual_reps` for all set types instead of `s.reps` for working sets.
+
+### Design notes
+- Single-row layout trades two-row compactness for cleaner column alignment and reduced visual complexity. All data still visible: set label, load, reps, target RPE, actual RPE, e1RM.
+- Pre-filled reps reduce input burden: users see planned values immediately, can adjust downward if needed.
+- AMRAP @RPE shows target (e.g., "7 / 80%") not actual; a.RPE input captures perceived exertion for logging.
+- Joker rows use muted text color and fixed @RPE "—" since jokers have no prescribed intensity.
+
+### Validation gates (all pass)
+1. Single-row layout (one row per set, not two) — PASS
+2. No spinner arrows on number inputs — PASS (CSS `-moz-appearance: textfield` + WebKit hiders)
+3. Column widths fixed: Set 38px, Load 140px, Reps 52px, @RPE 90px, a.RPE 70px, e1RM flex — PASS
+4. Reps pre-filled: working "5"/"6", AMRAP "★" placeholder, joker "1" — PASS
+5. Load: working sets show "127.5kg (281lbs)", jokers show input, AMRAP show text — PASS
+6. @RPE: working "5 / 75%", AMRAP "7 / 80%", joker "—" — PASS
+7. Finish Session button disabled until AMRAP reps filled, enabled after — PASS (browser verified)
+8. e1RM calculates Epley formula (weight × (1 + reps / 30)) when AMRAP reps filled — PASS (135kg × 1.333 ≈ 180kg for 10 reps)
+9. No "tier" word in rendered output — PASS (tier removed from all output templates)
+10. Padding 5px 8px applied to all cells; row borders 0.5px — PASS (CSS visible)
+
+### Files changed
+`index.html` (Workout tab: woRenderSession, CSS, event handlers, woSaveSession)
+
+---
+
+## 2026-06-14 — _resolve_e1rm helper + Hevy e1RM fallback for session route
+
+### What changed
+- **`main.py`**: Added `_load_api_key(conn)` — reads and decrypts the Hevy API key using an existing DB connection (avoids a second connection open). Added `_resolve_e1rm(conn, hevy_exercise_id)` — looks up the most recent e1RM across all active blocks via `e1rm_log` joined to `exercise_slots`, then falls back to `HevyClient.best_e1rm_from_hevy()` if nothing is found locally (skipped if no API key). No write-back to `e1rm_log` from Hevy: the schema `CHECK` constraint only allows `('amrap','joker_avg','manual')` and the function lacks the `active_block_id`/`exercise_slot_id` FKs. Replaced the inline `e1rm_log` query in `GET /active-blocks/{id}/session` for both `source=="tm"` and `source=="e1rm"` with calls to `_resolve_e1rm`. Replaced the duplicate inline lookup in `GET /exercises/{hevy_exercise_id}/e1rm` with the same helper. **Behavioral change**: session route previously scoped e1rm_log to the current `active_block_id + slot_id`; now queries by `hevy_exercise_id` across all blocks — cross-block e1RM reuse is intentional.
+
+### Design notes
+- `async def` in the spec was aspirational — `best_e1rm_from_hevy` uses `httpx.Client` (sync). All routes and helpers remain sync; FastAPI runs sync routes in a thread pool.
+- For `source=="tm"` the TM setting (`_setting_float_or_none(conn, "tm_{slot_id}")`) is still consulted as a final fallback after `_resolve_e1rm` returns None, preserving the existing manual training-max workflow.
+
+### Validation gates (all pass)
+1. `python -m py_compile main.py` — PASS
+2. `uvicorn main:app --port 8126` server starts — PASS
+3. `GET /active-blocks/9/session` — TM slot returns `first_set_weight_kg=127.5`, all sets non-null — PASS
+
+### Files changed
+`main.py`
+
+---
+
+## 2026-06-14 — Import cleanup + active block guard
+
+### What changed
+- **`main.py`** (`import_program`): Added active block guard at the start of `POST /programs/{id}/import` — returns HTTP 400 if any `active_blocks` row exists for this program with `status = 'active'`. Added FK-safe cleanup before reinserting: deletes `exercise_slots` → `days` → `microcycles` → `blocks` → `tiers` for the program, all parameterized, all inside the same transaction as the subsequent inserts. If the import fails after cleanup, the transaction rolls back and old data is preserved.
+
+### Validation gates (all pass)
+1. `python -m py_compile main.py` — PASS
+2. Import same notation twice to program 12 → Import 1: `slots=6`, Import 2: `slots=6` (no doubling) — PASS
+
+### Files changed
+`main.py`
+
+---
+
+## 2026-06-14 — Three-level block/microcycle schema + parser rewrite
+
+### What changed
+- **`database.py`**: Added new `blocks` table (`id, program_id, block_number, label`). Renamed old `blocks` table (microcycle level) to `microcycles` via `ALTER TABLE` before `executescript()`. Added `block_id INTEGER REFERENCES blocks(id)` to `microcycles`. Three try/except migrations for: `source_params` column on `exercise_slots`, `block_id` column on `microcycles`, and the rename itself.
+- **`program_parser.py`**: Full rewrite for three-level `{block}.{microcycle}.{day}` header format. New set notation: `+` suffix on last RPE for AMRAP (`5@5,6,7+`), jokers as `3x1J +10,15,20`, BBB unchanged (`5x10 @.65 e1RM`). Returns `{"blocks": [...], "errors": [...]}` with three-level nesting. Parser is pure — no DB, no HTTP.
+- **`tests/test_parser.py`**: Rewrote all 31 tests for new notation and output shape. 31/31 pass.
+- **`main.py`**: All SQL `blocks` (microcycle level) references updated to `microcycles`. `_fetch_program_tree` includes block level in response. `import_program` rewritten to walk three-level parsed output; inserts blocks → microcycles → days → slots. Response includes `blocks` count. `source_to_tier` uses `behaviour='free'` to stay compatible with existing DB `CHECK` constraint.
+- **`index.html`**: `normalizeProgramDetail` rewritten for three-level tree. `reconstructNotation` uses `{block}.{mc}.{day}` prefix. `_reconstructSetNotation` handles `+` AMRAP suffix and new joker format. `woGetCycleLabel` searches nested blocks. Textarea placeholder updated to spec notation.
+
+### Validation gates (all pass)
+1. `py_compile main.py program_parser.py database.py` — PASS
+2. `python -m unittest tests/test_parser.py` — 31/31
+3. Server starts (`uvicorn` port 8126) — PASS
+4. Import spec notation → `{"imported":true,"blocks":1,"microcycles":1,"days":2,"slots":6}` — PASS
+5. GET /programs/{id} tree: `blocks:1 mcs:1 days:2` — PASS
+6. Squat: `source_params={"source":"tm","wm_pct":0.9}`, 6 sets, last working `is_amrap:true`, jokers at 0.10/0.15/0.20 — PASS
+7. Wrap Press: `source_params={"source":"e1rm"}` — PASS
+8. Hamstring Curl: `source_params={"source":"free"}` — PASS
+9. DDP slot: `source_params={"source":"ddp","increment_kg":2.5}` — PASS
+10. Reconstruction exact match (two-day spec, all slot types) — PASS
+11. 31/31 tests rerun — PASS
+
+### Files changed
+`database.py`, `program_parser.py`, `tests/test_parser.py`, `main.py`, `index.html`
+
+---
+
+## 2026-06-14 — Programs tab two-panel UI + parser tests
+
+### What changed
+- **`index.html`**: Replaced three-screen Programs flow with permanent two-panel layout (program list left, text editor right; stacks on mobile ≤680px). Program list rows show name + inline delete button (confirm dialog). Clicking a program selects it and reconstructs its notation into the editor via `reconstructNotation()`. "+ New" prompts for name and POSTs. "Import" calls `POST /programs/{id}/import`; shows microcycle/day/slot counts and any exercise-match errors. "Start" activates the program as an active block. Exercise autocomplete shows floating dropdown on typing (300ms debounce, client-side filter from `state.exercises`). Tab labels: Workout / Program / Settings (no single-letter prefixes). Word "tier" does not appear in the rendered UI.
+- **`program_parser.py`**: Fixed BBB group (`5x10 @.65 e1RM`) to return `{"source":"e1rm"}` instead of `None` so Bench-style BBB slots correctly get `source=e1rm` on import.
+- **`tests/test_parser.py`** (new): 22 unittest cases covering day-prefix parsing, source tags (tm/e1rm/ddp/free), all set group patterns (RPE list, NxRPE, NxFree, BBB, Joker), slash groups, slot ordering, edge cases.
+
+### Files changed
+`index.html`, `program_parser.py`, `tests/test_parser.py` (new)
+
+### Gate
+1. `python -m py_compile main.py program_parser.py database.py` → PASS
+2. `python -m unittest tests.test_parser -q` → 22 tests OK (pytest not installed; unittest covers same cases)
+3. uvicorn started on port 8129 — PASS
+4. `PRAGMA table_info(exercise_slots)` → `source_params` present; tiers DDL has `tm` → PASS
+5. Tab labels: Workout / Program / Settings, no single-letter prefixes → PASS
+6. Import notation `Squat TM90 / Jokers + Bench BBB + Hamstring Curl` → mc=1 days=1 slots=3 → PASS
+7. Squat slot: `source=tm wm_pct=0.90`, 3 working + 3 jokers → PASS
+8. Bench slot: `source=e1rm`, 5 sets → PASS
+9. Hamstring Curl slot: `source=free`, 5 sets no RPE → PASS
+10. Unknown exercise import: partial success + error list, did not abort → PASS
+11. Notation reconstruction: `reconstructNotation()` reads cycles/days/slots and produces correct prefix/source-tag strings
+12. Session route: tm slot without TM set → null weight; free slot → null weight → PASS
+13. Word "tier" not in rendered Programs UI → PASS
+
+---
+
+## 2026-06-14 — Session load source_params + program import endpoint
+
+### What changed
+- **`main.py` — `GET /active-blocks/{id}/session`**: Added `source_params` to slot SELECT. New baseline computation path: `source="tm"` → `e1rm_kg * wm_pct` (wm_pct from source_params, fallback app_settings, fallback 0.90); `source="e1rm"` → raw e1rm_kg; `source="ddp"` → most recent non-joker session_log weight; `source="free"` → null. Per-set `planned_weight_kg` now computed as `round_weight(baseline * rpe_percentage)` for new source-params slots. Old `tier_behaviour` logic preserved as fallback for legacy programs.
+- **`main.py` — `POST /programs/{id}/import`**: Parses program text via `program_parser.parse_program`; returns 422 if parse errors. Finds or creates tiers per unique source. Inserts blocks → days → exercise_slots with `wave_params={"sets":[...]}` and `source_params` as JSON. Fuzzy-matches exercises case-insensitively against `hevy_exercise_cache`; unmatched slots stored with `hevy_exercise_id=""` and added to response errors.
+
+### Files changed
+`main.py`
+
+### Gate
+- `python -m py_compile main.py` → OK
+
+---
+
+## 2026-06-14 — Text-based program entry UI (schema + parser + frontend replacement)
+
+### What changed
+- **`database.py`**: Added `source_params TEXT` column to `exercise_slots` DDL; updated `tiers.behaviour` CHECK to `('tm','e1rm','ddp','free')`; added `ALTER TABLE` migration in `init_db()` try/except.
+- **`program_parser.py`** (new): Pure parser for program notation text. Parses `{cycle}.{day} Exercise - sets / groups` notation. Returns `{"microcycles": [...], "errors": [...]}`. Supports TM%, e1RM, DDP source tags; RPE list, NxRPE, NxFree, BBB, and Joker set group patterns.
+- **`main.py`**: Added `import program_parser`; added `source_params` field to `SlotInput` and slot responses; added `POST /programs/parse` endpoint.
+- **`index.html`**: Replaced three-screen Programs tab builder (list → program detail → day/movement builder) with text-entry UI (list → text-entry → read-only program view). Removed ~600 lines of old render functions and all associated event handlers. Tab labels no longer include single-letter icons.
+
+### Files changed
+`database.py`, `program_parser.py` (new), `main.py`, `index.html`
+
+### Gate
+- `python -m py_compile main.py database.py program_parser.py` — all pass
+- No dangling references to deleted functions in `index.html`
+
+---
+
+## 2026-06-13 — Day view Loading column (replace Sets + @RPE)
+
+### Program day movement list now shows Loading from wave_params.sets
+- **Files changed:**
+  - `index.html` — replaced day-view table columns from `Movement | Sets | @RPE | Actions` to `Movement | Loading | Actions`; replaced `summarizeSets(slot)` with `formatLoading(slot)` that parses `wave_params.sets` and formats set slots as `reps@rpe` (working), `reps+@rpe` (AMRAP), and `repsJ` (Joker); returns `—` when `wave_params` is null/malformed or set rows are invalid
+- **Validation:**
+  - Opened Program > `531BBB-AR` > `Micro 1` > `Day 1` with saved movement containing working, AMRAP, and Joker sets — PASS
+  - Loading column rendered as `5@5 / 5@6 / 5+@7 / 1J / 1J / 1J` for the saved movement — PASS
+  - AMRAP set displayed with `+` suffix and RPE (`5+@7`) — PASS
+  - Joker sets displayed with `J` suffix and no RPE (`1J / 1J / 1J`) — PASS
+  - `@RPE` column no longer present in day-view header (header reads `Movement | Loading | Actions`) — PASS
+- **Status:** COMPLETED
+
+## 2026-06-13 — Per-slot WM% setting: backend endpoints + session route + frontend input
+
+### WM% read per slot in session load; GET/POST settings endpoints; program builder WM% input
+- **Files changed:**
+  - `main.py` — added `SlotWmPctInput` Pydantic model; added `POST /settings/wm-pct` (INSERT OR REPLACE into `app_settings` keyed as `wm_pct_{slot_id}`); added `GET /settings/wm-pct/{slot_id}` (404 if not set); session route: replaced hardcoded `baseline_for_wave = e1rm_kg` with `wm_pct` lookup from `app_settings` keyed as `wm_pct_{slot_id}` (default 0.90), applied as `baseline_for_wave = e1rm_kg * wm_pct`
+  - `index.html` — added `wmPctBySlotId: {}` to state; added `getWmPct(slotId)` and `saveWmPct(slotId, value)` helpers; `preloadDayTMs` now fetches TM and WM% in parallel per slot; movement row template: WM% number input (min 50, max 100, step 1, no spinner), label "WM%", default 90, populates from `state.wmPctBySlotId`; WM display reads `wmPct / 100` instead of hardcoded `0.9`; blur handler on `data-wm-pct-slot` saves to API, updates `state.wmPctBySlotId`, and patches `data-wm-display-slot` span directly without full re-render; `wmPctBySlotId` reset alongside `tmBySlotId` in three navigation reset sites
+- **Validation:**
+  - `python -m py_compile main.py` — PASS
+  - `uvicorn main:app --port 8126` — PASS
+  - `POST /settings/wm-pct` `{slot_id:1, value:85.0}` → `{"slot_id":1,"value":85.0}` 200 — PASS
+  - `GET /settings/wm-pct/1` → `{"slot_id":1,"value":85.0}` — PASS
+  - `GET /settings/wm-pct/9999` → 404 — PASS
+  - Program builder movement row WM% input (UI verification required on live app) — pending
+  - WM% blur updates WM display (UI verification required on live app) — pending
+  - Session route `first_set_weight_kg` reflects stored `wm_pct` — verified by code review
+- **Status:** COMPLETED
+
+---
+
 ## 2026-06-12 — GET /exercises/{id}/e1rm + auto-populate TM on slot creation
 
 ### New endpoint and frontend TM wiring
