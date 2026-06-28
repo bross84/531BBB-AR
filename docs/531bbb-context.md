@@ -283,3 +283,41 @@ Stored in `app_settings` table under a known key. Never hardcoded, never committ
 **Claude** (architect / spec writer) → **Copilot** (implementer, reads `docs/copilot-context.md`) → **Brian** (reviewer / committer)
 
 Implementer agent instructions live in [`docs/copilot-context.md`](copilot-context.md).
+
+---
+
+## Local Docker (Windows)
+
+Tested on Windows with Docker Desktop. Uses a named volume — no bind-mount path issues.
+
+**Build and run:**
+```
+docker compose up --build -d
+```
+
+**Stop:**
+```
+docker compose stop
+```
+
+**Start after stop:**
+```
+docker compose start
+```
+
+**Tear down (removes containers and volume — destroys DB):**
+```
+docker compose down -v
+```
+
+**View logs:**
+```
+docker logs 531bbb -f
+```
+
+**Health check:**
+```
+curl http://localhost:8126/health
+```
+
+The SQLite DB is stored in the named volume `531bbb-ar_531bbb-data` at `/data/531bbb.db` inside the container. The Fernet key is at `/data/app.key`. Both persist across `stop`/`start` cycles. Only `down -v` wipes them.

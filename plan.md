@@ -25,6 +25,26 @@ Newest entries at the top. Each completed task is logged here with workflow, fil
 
 # Completed
 
+## 2026-06-23 — Local Docker (Windows) verified
+
+**Task:** Build container on Windows Docker Desktop and confirm all validation gates pass.
+
+**Audit findings (nothing required changes):**
+- Dockerfile: correct base image, copies all .py files + index.html + data/rpe_chart.csv via `COPY . .`, exposes 8126, correct CMD.
+- docker-compose.yml: named volume `531bbb-data:/data` is correct for Windows (no absolute Linux paths). `FERNET_KEY_PATH` omitted but defaults safely to `/data/app.key` within the volume.
+- requirements.txt: all external imports covered (fastapi, uvicorn, httpx, python-dotenv, cryptography). No missing packages.
+
+**Gates:**
+1. `docker compose up --build` — PASS: build clean, container stays running
+2. `GET /health` — PASS: `{"status":"ok"}`
+3. DB persistence — PASS: `/data/531bbb.db` present after restart, same file (timestamp unchanged)
+4. requirements.txt complete — PASS: no missing packages
+5. docs/531bbb-context.md Local Docker section — PASS: added
+
+**Docs updated:** `docs/531bbb-context.md` — new `## Local Docker (Windows)` section with build/run/stop/logs commands.
+
+---
+
 ## 2026-06-15 — Workout session card layout rewrite (mobile)
 
 ### What changed

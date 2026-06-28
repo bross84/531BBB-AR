@@ -1258,18 +1258,39 @@
       const pos = textarea.selectionStart;
       const text = textarea.value;
       const lineStart = text.lastIndexOf("\n", pos - 1) + 1;
-      const lineEnd = text.indexOf("\n", pos);
-      const line = text.slice(lineStart, lineEnd === -1 ? undefined : lineEnd);
-      const cursorInLine = pos - lineStart;
-      const dashIdx = line.indexOf(" - ");
-      const pfxMatch = /^\d+\.\d+\s+/.exec(line);
-      const nameStart = pfxMatch ? pfxMatch[0].length : 0;
-      const nameEnd = dashIdx === -1 ? cursorInLine : Math.min(cursorInLine, dashIdx);
-      if (cursorInLine < nameStart || (dashIdx !== -1 && cursorInLine > dashIdx)) return null;
-      return line.slice(nameStart, nameEnd).trim();
+      const hashIdx = text.lastIndexOf("#", pos - 1);
+      if (hashIdx === -1 || hashIdx < lineStart) return null;
+      return text.slice(hashIdx + 1, pos);
     }
 
-    function _acShow(query) {
+    function _acPosition(textarea) {
+      const dropdown = document.getElementById("exerciseAutocomplete");
+      if (!dropdown) return;
+      const pos = textarea.selectionStart;
+      const text = textarea.value;
+      const style = window.getComputedStyle(textarea);
+      const mirror = document.createElement("div");
+      ['fontFamily','fontSize','fontWeight','lineHeight','letterSpacing',
+       'paddingTop','paddingRight','paddingBottom','paddingLeft',
+       'borderTopWidth','borderRightWidth','borderBottomWidth','borderLeftWidth',
+       'boxSizing','whiteSpace','wordWrap','wordBreak'].forEach(p => { mirror.style[p] = style[p]; });
+      mirror.style.cssText += ';position:absolute;visibility:hidden;overflow:hidden;width:' + textarea.offsetWidth + 'px;height:auto;top:0;left:0;';
+      mirror.appendChild(document.createTextNode(text.slice(0, pos)));
+      const marker = document.createElement("span");
+      marker.textContent = "​";
+      mirror.appendChild(marker);
+      mirror.appendChild(document.createTextNode(text.slice(pos)));
+      textarea.parentNode.appendChild(mirror);
+      const top = marker.offsetTop + marker.offsetHeight + textarea.offsetTop;
+      const left = Math.min(marker.offsetLeft + textarea.offsetLeft, textarea.offsetLeft + textarea.offsetWidth - 240);
+      textarea.parentNode.removeChild(mirror);
+      dropdown.style.top = top + "px";
+      dropdown.style.left = left + "px";
+      dropdown.style.right = "auto";
+      dropdown.style.width = "240px";
+    }
+
+    function _acShow(query, textarea) {
       const dropdown = document.getElementById("exerciseAutocomplete");
       if (!dropdown) return;
       if (!query || query.length < 2) { _acHide(); return; }
@@ -1279,6 +1300,7 @@
       dropdown.innerHTML = matches.map(e =>
         `<div class="autocomplete-item" data-ac-title="${escapeHtml(e.title)}">${escapeHtml(e.title)}</div>`
       ).join("");
+      if (textarea) _acPosition(textarea);
       dropdown.style.display = "block";
     }
 
@@ -1293,14 +1315,10 @@
       const pos = textarea.selectionStart;
       const text = textarea.value;
       const lineStart = text.lastIndexOf("\n", pos - 1) + 1;
-      const lineEnd = text.indexOf("\n", pos);
-      const line = text.slice(lineStart, lineEnd === -1 ? undefined : lineEnd);
-      const dashIdx = line.indexOf(" - ");
-      const pfxMatch = /^\d+\.\d+\s+/.exec(line);
-      const nameStart = lineStart + (pfxMatch ? pfxMatch[0].length : 0);
-      const nameEnd = lineStart + (dashIdx === -1 ? pos - lineStart : dashIdx);
-      textarea.value = text.slice(0, nameStart) + title + text.slice(nameEnd);
-      const newPos = nameStart + title.length;
+      const hashIdx = text.lastIndexOf("#", pos - 1);
+      if (hashIdx === -1 || hashIdx < lineStart) return;
+      textarea.value = text.slice(0, hashIdx) + title + text.slice(pos);
+      const newPos = hashIdx + title.length;
       textarea.setSelectionRange(newPos, newPos);
       state.programText = textarea.value;
       _acHide();
@@ -1353,7 +1371,7 @@
               <textarea id="programTextarea" spellcheck="false"
                 style="width:100%;min-height:420px;font-family:Consolas,monospace;font-size:0.9rem;resize:vertical;background:var(--bg-mute);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.7rem;color:var(--text);"
               >${escapeHtml(state.programText)}</textarea>
-              <div id="exerciseAutocomplete" class="autocomplete-dropdown" style="display:none;position:absolute;left:0;right:0;top:100%;"></div>
+              <div id="exerciseAutocomplete" class="autocomplete-dropdown" style="display:none;position:absolute;"></div>
             </div>
             <div id="programImportResult" style="margin-top:0.45rem;min-height:1.2rem;font-size:0.83rem;"></div>
             <details style="margin-top:0.6rem;">
@@ -2211,7 +2229,7 @@ Lying Leg Curl - 5x10</pre>
           clearTimeout(_acDebounce);
           _acDebounce = setTimeout(() => {
             const query = _acGetExerciseQuery(event.target);
-            if (query) _acShow(query); else _acHide();
+            if (query) _acShow(query, event.target); else _acHide();
           }, 300);
         }
       });
