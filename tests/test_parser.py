@@ -247,5 +247,47 @@ class TestErrors(unittest.TestCase):
         self.assertEqual("tm", sp["source"])
 
 
+class TestWaveSets(unittest.TestCase):
+
+    def test_wave_sets_per_set_reps_and_rpe(self):
+        result = parse_program("1.1.1 Squat - 5@5,3@6,1@7 TM90")
+        self.assertEqual([], result["errors"])
+        sets = _first_slot(result)["sets"]
+        self.assertEqual([5, 3, 1], [s["reps"] for s in sets])
+        self.assertEqual([5.0, 6.0, 7.0], [s["target_rpe"] for s in sets])
+        self.assertFalse(any(s["is_amrap"] for s in sets))
+
+    def test_wave_sets_trailing_plus_marks_last_amrap(self):
+        result = parse_program("1.1.1 Squat - 5@5,3@6,1@7+ TM90")
+        self.assertEqual([], result["errors"])
+        sets = _first_slot(result)["sets"]
+        self.assertEqual([False, False, True], [s["is_amrap"] for s in sets])
+        self.assertEqual("tm", _first_slot(result)["source_params"]["source"])
+
+    def test_wave_sets_do_not_swallow_rpe_list(self):
+        # 5@5,6,7+ is the shared-reps RPE list form, not wave sets
+        sets = _first_slot(parse_program("1.1.1 Squat - 5@5,6,7+"))["sets"]
+        self.assertEqual([5, 5, 5], [s["reps"] for s in sets])
+        self.assertEqual([5.0, 6.0, 7.0], [s["target_rpe"] for s in sets])
+
+    def test_wave_sets_mixed_with_other_group(self):
+        result = parse_program("1.1.1 Squat - 5@5,3@6,1@7+ / 3x1J +10,15,20 TM90")
+        self.assertEqual([], result["errors"])
+        sets = _first_slot(result)["sets"]
+        self.assertEqual(6, len(sets))
+        self.assertTrue(sets[2]["is_amrap"])
+        self.assertTrue(all(s["is_joker"] for s in sets[3:]))
+
+
+class TestExerciseNamesWithSeparator(unittest.TestCase):
+
+    def test_hyphen_spaced_name_splits_on_last_separator(self):
+        result = parse_program("1.1.1 Curl - Barbell - 3x10")
+        self.assertEqual([], result["errors"])
+        slot = _first_slot(result)
+        self.assertEqual("Curl - Barbell", slot["exercise_name"])
+        self.assertEqual(3, len(slot["sets"]))
+
+
 if __name__ == "__main__":
     unittest.main()
