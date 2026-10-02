@@ -1,9 +1,11 @@
-# CLAUDE.md — hevy-fatigue
+# CLAUDE.md — 531 BBB-AR
 
 ## Project Overview
-Python/FastAPI application that logs daily readiness scores and workout data from Hevy.
-- **Stack:** Python, FastAPI, SQLite (`/data/hevy_fatigue.db`)
-- **Infra:** Docker container on Ubuntu homelab (CasaOS)
+Python/FastAPI training planner and workout logger for Wendler 5/3/1 BBB with autoregulation (e1RM from AMRAP/Joker sets). Syncs completed sessions to Hevy. See `README.md`, `plan.md` and `docs/531bbb-context.md`.
+- **Stack:** Python, FastAPI, stdlib `sqlite3` (no ORM), single-file vanilla-JS frontend (`index.html`)
+- **DB:** path from `DB_PATH` env var; `/data/531bbb.db` in Docker
+- **Tests:** `python -m unittest tests.test_parser` (pytest is not installed)
+- **Infra:** Docker container on Ubuntu homelab (CasaOS), port 8126. Don't alter the CasaOS metadata in `docker-compose.yml`
 - **Copilot:** Handles routine coding tasks — defer boilerplate and implementation detail to it
 
 ---
