@@ -407,15 +407,10 @@ def _load_api_key(conn) -> str | None:
 
 def _resolve_e1rm(conn, hevy_exercise_id: str) -> float | None:
     """
-    Return the best known e1RM for the given Hevy exercise ID.
-
-    Lookup order:
-    1. Most recent entry in e1rm_log (any active block) joined via exercise_slots.
-    2. Hevy workout history via HevyClient — skipped if no API key is stored.
-
-    Does not write to e1rm_log: the schema CHECK constraint only allows
-    ('amrap','joker_avg','manual') and the function lacks the active_block_id /
-    exercise_slot_id FKs required for a row insert.
+    Return the most recent e1RM for the given Hevy exercise ID from local e1rm_log.
+    Returns None if no AMRAP has been logged yet — the caller must handle null planned weights.
+    Hevy history lookup was removed from this path because it blocks session load (N serial HTTP
+    requests, one per slot). Use a dedicated sync endpoint if pre-populating e1RM from history.
     """
     row = conn.execute(
         """
@@ -428,13 +423,7 @@ def _resolve_e1rm(conn, hevy_exercise_id: str) -> float | None:
         """,
         (hevy_exercise_id,),
     ).fetchone()
-    if row is not None:
-        return float(row["e1rm_kg"])
-
-    api_key = _load_api_key(conn)
-    if not api_key:
-        return None
-    return hevy_client.HevyClient(api_key).best_e1rm_from_hevy(hevy_exercise_id)
+    return float(row["e1rm_kg"]) if row is not None else None
 
 
 def _session_slots_for_active_block(conn, state: dict[str, Any]) -> list[dict[str, Any]]:
@@ -1234,6 +1223,15 @@ def get_active_block_session(active_block_id: int):
         week_number = state["current_cycle"]
         slot_rows = _session_slots_for_active_block(conn, state)
 
+        # Bulk-load the RPE chart once — avoids one connection-open per set.
+        rpe_chart: dict[tuple[float, int], float] = {
+            (float(r["rpe"]), int(r["reps"])): float(r["percentage"])
+            for r in conn.execute("SELECT rpe, reps, percentage FROM rpe_chart").fetchall()
+        }
+
+        def _rpe_pct(rpe: float, reps: int) -> float | None:
+            return rpe_chart.get((rpe, reps))
+
         slots = []
         for row in slot_rows:
             wave_params = _parse_wave_params(row["wave_params"]) or {}
@@ -1258,7 +1256,7 @@ def get_active_block_session(active_block_id: int):
                     rpe_percentage = None
                     if target_rpe is not None:
                         try:
-                            rpe_percentage = get_rpe_percentage(float(target_rpe), reps_int)
+                            rpe_percentage = _rpe_pct(float(target_rpe), reps_int)
                         except (TypeError, ValueError):
                             pass
 
@@ -1409,7 +1407,6 @@ def get_active_block_session(active_block_id: int):
                     "sets": parsed_sets,
                 }
             )
-
     return {
         "active_block_id": state["id"],
         "cycle_number": state["current_cycle"],
