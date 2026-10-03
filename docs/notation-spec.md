@@ -47,7 +47,7 @@ A slot has one or more groups joined by ` / `. Each group expands to one or more
 | `R@I1,I2,I3` | one set per intensity, shared reps | exists (RPE only) |
 | `R1@I1,R2@I2,R3@I3` | per-set reps and intensity (wave) | exists (RPE only) |
 | `NxRJ +p1,p2,..` | Joker sets, jump percentages | exists |
-| `NxR@65% e1RM` | BBB-style volume | exists as `NxR @.65 e1RM` |
+| `NxR@65%` + load source | N sets of R reps at a percent of the baseline, e.g. `5x10@65% e1RM`. General form, not BBB-specific; the old `NxR @.65 e1RM` is a legacy alias that parses to the same thing | alias exists; `%` form new |
 
 ### 3.2 Intensity `I` (what follows `@`)
 
@@ -114,7 +114,7 @@ The parser accepts both; reconstruction (editor round-trip) emits the canonical 
 
 | Old | Canonical |
 |---|---|
-| `5x10 @.65 e1RM` | `5x10@65% e1RM` |
+| `5x10 @.65 e1RM` | `5x10@65% e1RM` (same meaning; legacy alias only, no separate BBB concept in the notation. Internally the `bbb_pct` fields fold into the general percent-of-baseline path, covered by the characterisation tests) |
 | `5@5,6,7+` | unchanged |
 | `5@5,3@6,1@7+` | unchanged |
 | `3x1J +10,15,20` | unchanged |
