@@ -64,6 +64,7 @@ Rule: a bare number after `@` is RPE; a `%` or unit is explicit. This removes th
 
 - Trailing **`+`** on the last intensity = last set is AMRAP (`5@5,6,7+`, `1@85%+`). Unchanged.
 - **`J`** marks Joker sets (unchanged).
+- **`TS`** (new, chosen by user 2026-10-03) marks the **TM set**: the set whose e1RM becomes the next microcycle's TM. Case-insensitive. Goes after the intensity and after any `+`: `3@8TS`, `1@9+TS`. On a `NxR@ITS` group it marks the group's last set. At most one `TS` per slot (parse error if more). No `TS` means the TM does not change. Distinct from the `TM90` source tag.
 - **Top set**: the heaviest non-Joker set is the "top set" automatically. `@-10%` back-offs are relative to it. *(new)*
 
 ---
@@ -100,7 +101,6 @@ Candidate keys (all optional, with defaults chosen so existing programs behave e
 |---|---|---|
 | `e1rm` | `amrap` (Epley, Joker band), `rpe` (any set with reps + RPE, via chart), `none` | `amrap` where an AMRAP exists, else `none` |
 | `inc` | kg added to the baseline per session/week on success | none |
-| `tm_from` | which set updates the TM when the microcycle ends: `top` (heaviest non-Joker RPE set), `amrap` (the `+` set) | none |
 | `round` | rounding step in kg for this exercise (microloading) | `2.5` |
 | `joker_band` | ±fraction | `0.05` |
 
@@ -161,7 +161,7 @@ Squat - 1@8 / 3x5@-10% e1RM [e1rm=rpe]
 6. **Does NOT parse today (corrected by user, 2026-10-03):** GPP day comes from the BBM Bridge template: 30 min steady-state cardio, modality varies (row or walk), so it is a duration, not sets x reps. Dips and Incline DB Curl are either myo-reps or density blocks (5 min, 6-10 reps or failure). Pull-ups are `3x5 / 1x3 / 1x8` (parses today as groups) and follow the "BS Method" = Bill Starr 5x5 shape (ramp of 5s, a heavier set of 3, a lighter back-off set of 8). The same shape appears in the RPE lifts as `5@6,5@7,3@8,8@6`. The weekly progression rule is still unknown. Bare `TM` (no number) is also invalid; today the tag is `TM90`.
 
 7. **TM progression (user, 2026-10-03):** the progression is the TM update. The top set of 3 from Day 3 sets next microcycle's TM; for the 5/3/1+ lift the Day 3 AMRAP does the same. No fixed weekly increment is used. ASSUMPTION (unconfirmed): TM = that set's e1RM, times a per-lift factor that defaults to 1.0. The sheet shows Deadlift day-3 e1RM 407 vs TM 405, but Squat 357 vs TM 316 and Bench 276 vs TM 257; those TMs may predate this day.
-9. **Which set drives the TM (user, 2026-10-03):** Squat and Bench: the fixed top set of 3 at RPE 8 (e1RM via the RPE chart). Deadlift: the Day 3 AMRAP, run up to RPE 9, so the reps achieved decide the number (`1@9+`). Proposed option key `tm_from=top|amrap` (see section 5).
+9. **Which set drives the TM (user, 2026-10-03):** Squat and Bench: the fixed top set of 3 at RPE 8 (e1RM via the RPE chart). Deadlift: the Day 3 AMRAP, run up to RPE 9, so the reps achieved decide the number (`1@9+`). User then pointed out this will not always be the case, so the TM set is designated explicitly with a `TS` marker (section 3.3), not inferred.
 
 8. **Pull-up progression (user, 2026-10-03):** linear, small (microloaded) weight added each week to the Starr-shape sets `3x5 / 1x3 / 1x8`. Uses the `[inc=...]` option. Consequence: the global 2.5 kg rounding rule must become a per-exercise rounding step (default 2.5 kg, overridable to e.g. 0.5 or 1.0 kg for microloaded lifts), otherwise small increments round away.
 
