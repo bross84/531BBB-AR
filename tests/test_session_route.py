@@ -367,13 +367,15 @@ class TestSessionLogging(SessionRouteCase):
         self._post([_log(self.slot, 1, "main", 100, 5, rpe=8)])  # e1RM 117.5
         self.assertEqual([97.5], self._planned(self.block))  # 117.5 * .83 = 97.5
 
-    @unittest.expectedFailure
     def test_amrap_set_type_sent_by_the_ui_updates_e1rm(self):
-        # KNOWN BUG: index.html sends set_type 'working' / 'amrap' / 'joker' — never 'main' — but the
-        # route only counts 'main' sets, so a real session never writes an e1RM. Intended: a logged
-        # AMRAP set with reps + RPE anchors the e1RM.
+        # index.html sends set_type 'working' / 'amrap' / 'joker' (never 'main'). The route used to
+        # count only 'main' sets, so a real session never wrote an e1RM.
         self._post([_log(self.slot, 1, "amrap", 100, 5, rpe=8)])
         self.assertEqual(117.5, self._e1rm_rows()[0]["e1rm_kg"])
+
+    def test_working_sets_do_not_write_e1rm(self):
+        self._post([_log(self.slot, 1, "working", 100, 5, rpe=8)])
+        self.assertEqual([], self._e1rm_rows())
 
     def test_hevy_id_written_back_on_success(self):
         self.hevy.post_workout.return_value = "hevy-123"

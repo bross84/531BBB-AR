@@ -1497,7 +1497,7 @@ def log_active_block_session(active_block_id: int, data: SessionLogInput):
             main_candidates = [
                 row
                 for row in set_rows
-                if row["set_type"] == "main"
+                if row["set_type"] in ("main", "amrap")
                 and row["reps"] is not None
                 and row["reps"] > 0
                 and row["actual_rpe"] is not None
