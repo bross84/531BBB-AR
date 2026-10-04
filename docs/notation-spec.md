@@ -178,6 +178,8 @@ Squat - 1@8 / 3x5@-10% e1RM [e1rm=rpe]
 18. **Last-done layout (user, 2026-10-04):** option C, the day shows "last done <date>" and each exercise shows last time's weight and RPE.
 19. **RPE history (user, 2026-10-04):** when the program started, weights were chosen by feel and RPE was only documented, so early sheet e1RMs are readouts of what was lifted, not plans. The user has their own RPE table and will provide it; load it in place of `data/rpe_chart.csv`.
 
+20. **Gauge week (user, 2026-10-04):** after a long layoff the first microcycle's numbers were "gauge sets": weights chosen by feel with an RPE logged, used to find the starting e1RMs/TMs. Notation needs no new syntax for this: RPE sets with no load-source tag (`5@6,7,8`) are free sets with an RPE target, so the app plans no weight and the logged weight + reps + RPE produce the e1RM. Later microcycles plan from the TM. (How the TM becomes a weight is still bookmark D.)
+
 ## Bookmarked discussions (not decided; come back to these)
 
 - **A. TM / block-level baseline.** How to say "this whole block plans from the TM". Candidate: a block line `1 [base=TM90]` with slot tags overriding. Also unresolved: where the percentage lives (tag vs block), whether the TM is a snapshot frozen at the `TS` set or recomputed live, and whether a TM change applies from the next microcycle only.
