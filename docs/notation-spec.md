@@ -180,7 +180,11 @@ Squat - 1@8 / 3x5@-10% e1RM [e1rm=rpe]
 
 20. **Gauge week (user, 2026-10-04):** after a long layoff the first microcycle's numbers were "gauge sets": weights chosen by feel with an RPE logged, used to find the starting e1RMs/TMs. Notation needs no new syntax for this: RPE sets with no load-source tag (`5@6,7,8`) are free sets with an RPE target, so the app plans no weight and the logged weight + reps + RPE produce the e1RM. Later microcycles plan from the TM. (How the TM becomes a weight is still bookmark D.)
 
+21. **The program evolves mid-block (user, 2026-10-04):** the current program is a work in progress. Volume was too fatiguing, so from microcycle 2 Day 1 was cut to 3x5 (Pendlay rows dropped by one set) while Days 2 and 3 stayed the same. Consequences: (a) volume can differ per microcycle, which the `block.micro.day` header already expresses; (b) the user must be able to edit the program text while a block is active. TODAY THIS IS NOT POSSIBLE: `POST /programs/{id}/import` returns 400 while the program has an active block, because import deletes and re-inserts every slot, which would orphan logged history. (c) Because the program is in flux, the Micro 3 weights are weak evidence of a fixed formula; bookmark D's reverse-engineering should not be treated as settled.
+
 ## Bookmarked discussions (not decided; come back to these)
+
+- **E. Editing a program while a block is active.** Needs edit-in-place for slots (match by day + exercise) that preserves slot ids and logged history, or versioning. Design before the schema work in step 4.
 
 - **A. TM / block-level baseline.** How to say "this whole block plans from the TM". Candidate: a block line `1 [base=TM90]` with slot tags overriding. Also unresolved: where the percentage lives (tag vs block), whether the TM is a snapshot frozen at the `TS` set or recomputed live, and whether a TM change applies from the next microcycle only.
 - **B. In-session e1RM rule.** Which e1RM feeds the next set in a session (latest set, average, highest) and what is stored at the end. User wants a detailed answer here; the sheet shows e1RMs 343, 352, 354 across a 6/7/8 RPE ramp, each next set planned from the one before.
