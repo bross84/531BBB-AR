@@ -174,6 +174,8 @@ Squat - 1@8 / 3x5@-10% e1RM [e1rm=rpe]
 15. **Round 3 answers (user, 2026-10-03):** quick-entry log shorthand wanted, but after the session engine (bookmark C). Dates stay out of the program text; the UI should instead show "last done" dates from the logged_at timestamp on each logged set (not shown anywhere today). Day labels (`1.3.4: Label`) stay optional and low priority. Cross-day references: not needed now, maybe in future, deferred. Project rename: at the end of step 4.
 16. **RPE chart check (2026-10-03):** the app's chart (`data/rpe_chart.csv`) with `e1RM = weight / chart% x 2.2046 lb` reproduces 20 of 26 e1RMs in the user's sheet within 1.5 lb; the other 6 differ by 1.6-2.6 lb (e.g. squat 132.5 kg x5 @8: app 351.9, sheet 354). The sheet probably uses a slightly different table.
 
+17. **TM in the current program (user, 2026-10-03):** TMs exist for Squat, Bench, Deadlift and Press. Claude's reading (user answered "yes" to "is it tracking only?"): in the current program the TM is a tracking number and nothing plans weights from it; TM-planned blocks are for other programs. A TM changes when a set marked `TS` is logged. Unconfirmed: whether the change applies to the same microcycle or only the next (moot while nothing reads the TM). This makes bookmark A (block-level baseline syntax) a future-program concern, not a blocker.
+
 ## Bookmarked discussions (not decided; come back to these)
 
 - **A. TM / block-level baseline.** How to say "this whole block plans from the TM". Candidate: a block line `1 [base=TM90]` with slot tags overriding. Also unresolved: where the percentage lives (tag vs block), whether the TM is a snapshot frozen at the `TS` set or recomputed live, and whether a TM change applies from the next microcycle only.
