@@ -7,6 +7,25 @@ Examples for Starr / Bridge-style programs below are **illustrative placeholders
 
 ---
 
+## 0. The concept, as Claude understands it (2026-10-04; for the user to correct)
+
+1. **A program is text the lifter keeps rewriting.** It says what to do per block, microcycle, day and exercise. It evolves as the lifter learns (e.g. volume cut from 5 to 3 sets in microcycle 2) and may keep evolving, including while a block is running. The text is the source of truth.
+2. **A set is prescribed as reps plus a target RPE.** The RPE chart links reps + RPE to a percentage of e1RM, in both directions: plan (e1RM -> weight) and measure (weight + reps + RPE -> e1RM).
+3. **Two numbers per lift.** The e1RM is a live estimate from logged sets and is never reduced. The TM is a stored max for the main lifts (squat, bench, deadlift, press): a percentage of an e1RM (e.g. `TM90`: e1RM 200 gives TM 180), updated when a set marked `TS` is logged.
+4. **Where a planned weight comes from changes by phase.** Gauge weeks have no plan (weights by feel, RPE recorded) and seed the numbers. Later weeks plan from the TM (microcycle 3 Day 2 is the first, roughly TM x RPE%). A different program may plan from the e1RM instead. Some days may plan from the live e1RM. So the baseline is a per-program/per-block choice, and the exact formula is not settled.
+5. **Logging records what actually happened.** Actual weight, reps and RPE (which can differ from target, e.g. 7.5 or 8.5) feed the e1RM. During a session, the next set's weight can be suggested from the updated e1RM; the lifter can always type something else.
+6. **Everything else is ordinary.** Exercises without RPE have typed weights (pre-filled from last time). Myo-reps and density blocks are normal logged sets. Cardio is not logged. Weights are plated in kg, shown with lb; e1RM shows in lb. Sessions sync to Hevy. The UI shows when each day and exercise was last done.
+7. **Not program-specific.** 5/3/1 pieces (Jokers, BBB, AMRAP anchoring) stay as options. Nothing is removed.
+
+**Not yet known (deliberately not assumed):** the exact TM-to-weight formula and rounding rule; the user's own RPE table; how the next in-session set's e1RM is chosen; which days plan from the TM versus the live e1RM.
+
+**Design consequences of "it keeps evolving":**
+- Planning rules are replaceable strategies chosen by program text, not hard-coded paths.
+- Planned weights are suggestions by default, so a wrong formula costs little.
+- Unknown notation options should be kept and warned about, not rejected, so the notation can grow without breaking old programs.
+- Editing a program mid-block must preserve logged history (bookmark E).
+- The characterisation tests stay green while rules change.
+
 ## 1. Principles
 
 1. **Backward compatible.** Every line that parses today keeps parsing to the same result. New syntax only adds.
