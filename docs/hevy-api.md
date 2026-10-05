@@ -49,3 +49,7 @@ Template fields: `id`, `title`, `type`, `primary_muscle_group`, `secondary_muscl
 3. History is never read except `best_e1rm_from_hevy`, which is unused after the June change.
 4. `workouts/events` is not used, so the local cache of Hevy data is never refreshed incrementally.
 5. RPE below 6 (used in the user's programs) has no Hevy representation.
+
+## Existing AI tooling (web search 2026-10-05; listings read, code NOT audited)
+
+Several community MCP servers wrap the Hevy API so Claude can read workouts and history and create or edit routines and workouts, per their listings covering all 15 public endpoints. Examples: https://github.com/Vellarasan/hevy-mcp, https://hevy-mcp.dev/, https://claudemarketplaces.com/mcp/chrisdoc/hevy-mcp. They need a Hevy Pro API key; because the server sees that key, review its code before use and use a key you can revoke.
