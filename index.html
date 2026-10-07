@@ -1235,14 +1235,14 @@
         for (const mc of block.microcycles || []) {
           for (const day of mc.days || []) {
             const slots = (day.slots || []).slice().sort((a, b) => a.slot_order - b.slot_order);
-            for (let i = 0; i < slots.length; i++) {
-              const slot = slots[i];
+            if (lines.length > 0) lines.push("");
+            lines.push(`${block.block_number}.${mc.cycle_number}.${day.day_number}`);
+            for (const slot of slots) {
               const sets = Array.isArray(slot.wave_params?.sets) ? slot.wave_params.sets : [];
               const hasBbb = sets.some(s => s.bbb_pct != null);
               const tag = hasBbb ? "" : _reconstructSourceTag(slot.source_params);
               const notation = _reconstructSetNotation(sets);
-              const prefix = i === 0 ? `${block.block_number}.${mc.cycle_number}.${day.day_number} ` : "";
-              lines.push(`${prefix}${slot.hevy_exercise_name || "Unknown"} - ${notation}${tag}`);
+              lines.push(`${slot.hevy_exercise_name || "Unknown"} - ${notation}${tag}`);
             }
           }
         }
@@ -1253,6 +1253,16 @@
     // ── Programs tab — autocomplete ───────────────────────────────────────────
 
     let _acDebounce = null;
+    let _acFocusedIdx = -1;
+
+    function _acSetFocus(idx) {
+      const dropdown = document.getElementById("exerciseAutocomplete");
+      if (!dropdown) return;
+      const items = dropdown.querySelectorAll(".autocomplete-item");
+      _acFocusedIdx = Math.max(-1, Math.min(idx, items.length - 1));
+      items.forEach((el, i) => el.classList.toggle("ac-focused", i === _acFocusedIdx));
+      if (_acFocusedIdx >= 0) items[_acFocusedIdx].scrollIntoView({ block: "nearest" });
+    }
 
     function _acGetExerciseQuery(textarea) {
       const pos = textarea.selectionStart;
@@ -1295,18 +1305,21 @@
       if (!dropdown) return;
       if (!query || query.length < 2) { _acHide(); return; }
       const q = query.toLowerCase();
-      const matches = state.exercises.filter(e => e.title.toLowerCase().includes(q)).slice(0, 8);
+      const starts = state.exercises.filter(e => e.title.toLowerCase().startsWith(q));
+      const contains = state.exercises.filter(e => !e.title.toLowerCase().startsWith(q) && e.title.toLowerCase().includes(q));
+      const matches = [...starts, ...contains].slice(0, 12);
       if (!matches.length) { _acHide(); return; }
       dropdown.innerHTML = matches.map(e =>
         `<div class="autocomplete-item" data-ac-title="${escapeHtml(e.title)}">${escapeHtml(e.title)}</div>`
       ).join("");
-      if (textarea) _acPosition(textarea);
       dropdown.style.display = "block";
+      if (textarea) try { _acPosition(textarea); } catch(e) {}
     }
 
     function _acHide() {
       const dropdown = document.getElementById("exerciseAutocomplete");
       if (dropdown) dropdown.style.display = "none";
+      _acFocusedIdx = -1;
     }
 
     function _acApply(title) {
@@ -1362,7 +1375,7 @@
                   style="font-size:0.78rem;padding:0.26rem 0.65rem;">Start</button>` : ""}
                 <button id="programImportBtn" class="btn primary" type="button"
                   style="font-size:0.78rem;padding:0.26rem 0.65rem;"
-                  ${sel ? "" : "disabled"}>Import</button>
+                  ${sel ? "" : "disabled"}>Save Program</button>
                 <button id="programClearBtn" class="btn" type="button"
                   style="font-size:0.78rem;padding:0.26rem 0.65rem;">Clear</button>
               </div>
@@ -1407,7 +1420,13 @@ Lying Leg Curl - 5x10</pre>
       try {
         const detail = await fetchJson(`/programs/${programId}`, { method: "GET" });
         state.programDetail = normalizeProgramDetail(detail);
-        state.programText = reconstructNotation(state.programDetail);
+        const saved = reconstructNotation(state.programDetail);
+        const draft = localStorage.getItem("programDraft");
+        state.programText = saved || draft || "";
+        if (!saved && draft) {
+          const resultEl = document.getElementById("programImportResult");
+          setImportResult(resultEl, "Draft restored — click Save Program to save.", "warn");
+        }
         renderProgramsLayout();
         document.getElementById("programTextarea")?.focus();
       } catch (err) {
@@ -1504,6 +1523,7 @@ Lying Leg Curl - 5x10</pre>
           ? ` ${result.errors.length} exercise(s) not matched.`
           : "";
         setImportResult(resultEl, msg + errSuffix, result.errors?.length ? "warn" : "ok");
+        localStorage.removeItem("programDraft");
         const detail = await fetchJson(`/programs/${state.selectedProgramId}`, { method: "GET" });
         state.programDetail = normalizeProgramDetail(detail);
         state.programText = reconstructNotation(state.programDetail);
@@ -2202,6 +2222,7 @@ Lying Leg Curl - 5x10</pre>
           state.programText = "";
           const ta = document.getElementById("programTextarea");
           if (ta) ta.value = "";
+          localStorage.removeItem("programDraft");
           _acHide();
           return;
         }
@@ -2226,6 +2247,7 @@ Lying Leg Curl - 5x10</pre>
 
         if (event.target.id === "programTextarea") {
           state.programText = event.target.value;
+          localStorage.setItem("programDraft", state.programText);
           clearTimeout(_acDebounce);
           _acDebounce = setTimeout(() => {
             const query = _acGetExerciseQuery(event.target);
@@ -2238,10 +2260,40 @@ Lying Leg Curl - 5x10</pre>
         woHandleChange(event.target);
       });
 
-      document.body.addEventListener("keydown", async (event) => {
-        if (event.target.id === "programTextarea" && event.key === "Escape") {
+      document.addEventListener("mousedown", (event) => {
+        const dropdown = document.getElementById("exerciseAutocomplete");
+        if (!dropdown || dropdown.style.display === "none") return;
+        if (dropdown.contains(event.target)) {
+          event.preventDefault();
+          const acItem = event.target.closest("[data-ac-title]");
+          if (acItem) _acApply(acItem.getAttribute("data-ac-title"));
+        } else {
           _acHide();
-          return;
+        }
+      });
+
+      document.body.addEventListener("keydown", async (event) => {
+        if (event.target.id === "programTextarea") {
+          const dropdown = document.getElementById("exerciseAutocomplete");
+          const open = dropdown && dropdown.style.display !== "none";
+          if (event.key === "Escape") { _acHide(); return; }
+          if (open && event.key === "ArrowDown") {
+            event.preventDefault();
+            _acSetFocus(_acFocusedIdx + 1);
+            return;
+          }
+          if (open && event.key === "ArrowUp") {
+            event.preventDefault();
+            _acSetFocus(_acFocusedIdx - 1);
+            return;
+          }
+          if (open && event.key === "Enter" && _acFocusedIdx >= 0) {
+            event.preventDefault();
+            const items = dropdown.querySelectorAll(".autocomplete-item");
+            const item = items[_acFocusedIdx];
+            if (item) _acApply(item.getAttribute("data-ac-title"));
+            return;
+          }
         }
 
         const row = event.target.closest("[data-select-program]");

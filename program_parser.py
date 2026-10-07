@@ -20,6 +20,7 @@ _JOKER  = re.compile(r'^(\d+)x1[Jj]\s+\+([\d,]+)$')                         # 3x
 _NX_RPE = re.compile(r'^(\d+)x(\d+)@([\d.]+)(\+?)$')                        # 3x5@7 or 3x5@7+
 _NX_FREE = re.compile(r'^(\d+)x(\d+)$')                                      # 5x10
 _RPE_LIST = re.compile(r'^(\d+)@([\d.,+]+)$')                                # 5@5,6,7+ or 5@5,6,7
+_WAVE_SET = re.compile(r'^(\d+)@([\d.]+)(\+?)$')                             # single wave entry: 5@7 or 1@8+
 
 
 def _extract_source_tag(tokens: list[str]) -> tuple[list[str], dict[str, Any] | None]:
@@ -96,6 +97,18 @@ def _parse_group(raw: str, line_num: int, errors: list[dict]) -> tuple[list[dict
             {"reps": reps, "target_rpe": None, "is_amrap": False, "is_joker": False}
             for _ in range(n)
         ]
+        return sets, source_params
+
+    # Wave sets: 5@5,3@6,1@7+ — each token is reps@rpe, last + means AMRAP
+    wave_tokens = [t.strip() for t in expr.split(",")]
+    if len(wave_tokens) > 1 and all(_WAVE_SET.match(t) for t in wave_tokens):
+        sets = []
+        for idx, token in enumerate(wave_tokens):
+            m = _WAVE_SET.match(token)
+            reps = int(m.group(1))
+            rpe = float(m.group(2))
+            is_amrap = m.group(3) == "+" and idx == len(wave_tokens) - 1
+            sets.append({"reps": reps, "target_rpe": rpe, "is_amrap": is_amrap, "is_joker": False})
         return sets, source_params
 
     # RPE list: reps@rpe1,rpe2,...  — trailing + on last RPE means AMRAP
@@ -195,7 +208,7 @@ def parse_program(text: str) -> dict[str, Any]:
             errors.append({"line": line_num, "message": f"Missing ' - ' separator: {line!r}"})
             continue
 
-        exercise_name, sets_str = line.split(" - ", 1)
+        exercise_name, sets_str = line.rsplit(" - ", 1)
         exercise_name = exercise_name.strip()
         sets_str = sets_str.strip()
 
