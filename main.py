@@ -165,7 +165,6 @@ class WorkoutEntry(BaseModel):
 
 class SavedWorkout(BaseModel):
     id: str | None = None
-    warnings: list[str]
 
 
 class RpeTable(BaseModel):
@@ -227,11 +226,11 @@ def create_hevy_workout(entry: WorkoutEntry):
     """Save a logged workout (weights in lb) to Hevy. Hevy has no delete endpoint, so each call
     that succeeds creates a real workout in the account."""
     try:
-        body, warnings = build_hevy_workout(entry.model_dump())
+        body = build_hevy_workout(entry.model_dump())
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     created = _call_hevy(lambda client: client.create_workout(body))
-    return {"id": created.get("id"), "warnings": warnings}
+    return {"id": created.get("id")}
 
 
 # ── Settings ───────────────────────────────────────────────────────────────────

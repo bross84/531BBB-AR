@@ -4,7 +4,7 @@ No DB access, no HTTP calls, no side effects.
 
 Hevy's rules (docs/hevy-api.md): snake_case keys wrapped in {"workout": {...}}; set type is one of
 warmup / normal / failure / dropset; rpe is one of 6, 7, 7.5, 8, 8.5, 9, 9.5, 10 or null.
-An RPE Hevy cannot store (below 6, or 6.5) is left blank, and the caller is warned.
+An RPE Hevy cannot store (below 6, or 6.5) is simply left blank.
 Weights are typed in lb but loaded in kg, so they are posted as the nearest half kilo (198 lb -> 90 kg).
 """
 from __future__ import annotations
@@ -34,19 +34,10 @@ def _parse_time(value: str) -> datetime:
         raise ValueError(f"Invalid timestamp: {value!r}") from exc
 
 
-def _set_label(set_type: str, working: int) -> str:
-    """Name a set the way the log page numbers it: warm-ups are unnumbered, every other set counts."""
-    if set_type == "warmup":
-        return "warm-up"
-    prefix = {"failure": "failure ", "dropset": "drop "}.get(set_type, "")
-    return f"{prefix}set {working}"
-
-
-def build_hevy_workout(entry: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+def build_hevy_workout(entry: dict[str, Any]) -> dict[str, Any]:
     """
     Convert a logged workout (weights in lb) into Hevy's request body.
-    Returns (body, warnings). Raises ValueError if the workout can't be sent.
-    Warnings list anything dropped, e.g. an RPE Hevy can't store.
+    Raises ValueError if the workout can't be sent.
     """
     title = (entry.get("title") or "").strip()
     if not title:
@@ -57,7 +48,6 @@ def build_hevy_workout(entry: dict[str, Any]) -> tuple[dict[str, Any], list[str]
     if end < start:
         raise ValueError("Workout end time is before its start time.")
 
-    warnings: list[str] = []
     exercises = []
     for raw_exercise in entry.get("exercises") or []:
         template_id = (raw_exercise.get("exercise_template_id") or "").strip()
@@ -66,14 +56,11 @@ def build_hevy_workout(entry: dict[str, Any]) -> tuple[dict[str, Any], list[str]
             raise ValueError(f"{name} has no Hevy exercise id.")
 
         sets = []
-        working = 0
         for number, raw_set in enumerate(raw_exercise.get("sets") or [], start=1):
             set_type = raw_set.get("type") or "normal"
             if set_type not in SET_TYPES:
                 raise ValueError(f"{name} set {number}: unknown set type {set_type!r}.")
 
-            if set_type != "warmup":
-                working += 1
             weight_lb = raw_set.get("weight_lb")
             if weight_lb is not None and weight_lb < 0:
                 raise ValueError(f"{name} set {number}: weight can't be negative.")
@@ -85,10 +72,6 @@ def build_hevy_workout(entry: dict[str, Any]) -> tuple[dict[str, Any], list[str]
             if rpe is not None and not 0 <= float(rpe) <= 10:
                 raise ValueError(f"{name} set {number}: RPE must be between 0 and 10.")
             if rpe is not None and float(rpe) not in HEVY_RPE_VALUES:
-                warnings.append(
-                    f"{name} {_set_label(set_type, working)}: RPE {float(rpe):g} can't be stored in Hevy, "
-                    "so it was left blank."
-                )
                 rpe = None
 
             sets.append(
@@ -120,4 +103,4 @@ def build_hevy_workout(entry: dict[str, Any]) -> tuple[dict[str, Any], list[str]
     description = (entry.get("description") or "").strip()
     if description:
         workout["description"] = description
-    return {"workout": workout}, warnings
+    return {"workout": workout}

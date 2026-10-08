@@ -171,10 +171,9 @@ class TestCreateHevyWorkout(WorkoutsRouteCase):
         self.assertEqual([50.0, 120.0, 127.5], [s["weight_kg"] for s in sets])
         self.assertEqual("tpl-squat", w["exercises"][0]["exercise_template_id"])
 
-    def test_unstorable_rpe_is_dropped_and_reported(self):
+    def test_unstorable_rpe_is_left_blank(self):
         r = self._post()
-        self.assertEqual(1, len(r.json()["warnings"]))
-        self.assertIn("RPE 5", r.json()["warnings"][0])
+        self.assertEqual({"id": "new-1"}, r.json())
         (body,), _ = self.hevy.create_workout.call_args
         self.assertIsNone(body["workout"]["exercises"][0]["sets"][2]["rpe"])
 

@@ -50,17 +50,16 @@ class TestConversion(unittest.TestCase):
 class TestBody(unittest.TestCase):
 
     def test_wrapped_in_workout_with_snake_case_keys(self):
-        body, warnings = build_hevy_workout(_entry())
+        body = build_hevy_workout(_entry())
         self.assertEqual(["workout"], list(body))
         w = body["workout"]
         self.assertEqual("BS-Bridge 1.3.3", w["title"])
         self.assertEqual("2026-10-09T17:00:00Z", w["start_time"])
         self.assertEqual("2026-10-09T18:00:00Z", w["end_time"])
         self.assertEqual("tpl-squat", w["exercises"][0]["exercise_template_id"])
-        self.assertEqual([], warnings)
 
     def test_sets_carry_type_kg_reps_rpe(self):
-        sets = build_hevy_workout(_entry())[0]["workout"]["exercises"][0]["sets"]
+        sets = build_hevy_workout(_entry())["workout"]["exercises"][0]["sets"]
         self.assertEqual(
             [
                 {"type": "warmup", "weight_kg": 50.0, "reps": 5, "rpe": None},
@@ -72,24 +71,24 @@ class TestBody(unittest.TestCase):
 
     def test_bodyweight_set_has_null_weight(self):
         entry = _entry(exercises=[{"exercise_template_id": "t", "sets": [{"weight_lb": None, "reps": 8}]}])
-        s = build_hevy_workout(entry)[0]["workout"]["exercises"][0]["sets"][0]
+        s = build_hevy_workout(entry)["workout"]["exercises"][0]["sets"][0]
         self.assertIsNone(s["weight_kg"])
         self.assertEqual("normal", s["type"])
 
     def test_notes_and_description_only_when_present(self):
-        body = build_hevy_workout(_entry())[0]["workout"]
+        body = build_hevy_workout(_entry())["workout"]
         self.assertNotIn("description", body)
         self.assertNotIn("notes", body["exercises"][0])
         entry = _entry(description="felt good")
         entry["exercises"][0]["notes"] = " belt on "
-        body = build_hevy_workout(entry)[0]["workout"]
+        body = build_hevy_workout(entry)["workout"]
         self.assertEqual("felt good", body["description"])
         self.assertEqual("belt on", body["exercises"][0]["notes"])
 
     def test_exercise_with_no_sets_is_dropped(self):
         entry = _entry()
         entry["exercises"].append({"exercise_template_id": "tpl-bench", "sets": []})
-        body = build_hevy_workout(entry)[0]["workout"]
+        body = build_hevy_workout(entry)["workout"]
         self.assertEqual(["tpl-squat"], [e["exercise_template_id"] for e in body["exercises"]])
 
 
@@ -98,9 +97,8 @@ class TestRpe(unittest.TestCase):
     def test_every_hevy_rpe_value_is_kept(self):
         for rpe in (6, 7, 7.5, 8, 8.5, 9, 9.5, 10):
             entry = _entry(exercises=[{"exercise_template_id": "t", "sets": [{"weight_lb": 100, "reps": 5, "rpe": rpe}]}])
-            body, warnings = build_hevy_workout(entry)
+            body = build_hevy_workout(entry)
             self.assertEqual(float(rpe), body["workout"]["exercises"][0]["sets"][0]["rpe"])
-            self.assertEqual([], warnings)
 
     def test_rpe_hevy_cannot_store_leaves_the_field_blank_with_no_note(self):
         entry = _entry(
@@ -108,13 +106,11 @@ class TestRpe(unittest.TestCase):
                 {"exercise_template_id": "t", "title": "Squat", "sets": [{"weight_lb": 100, "reps": 8, "rpe": 5}]}
             ]
         )
-        body, warnings = build_hevy_workout(entry)
-        exercise = body["workout"]["exercises"][0]
+        exercise = build_hevy_workout(entry)["workout"]["exercises"][0]
         self.assertIsNone(exercise["sets"][0]["rpe"])
         self.assertNotIn("notes", exercise)
-        self.assertEqual(["Squat set 1: RPE 5 can't be stored in Hevy, so it was left blank."], warnings)
 
-    def test_warnings_name_each_unstorable_rpe_with_the_log_pages_set_numbers(self):
+    def test_every_unstorable_rpe_is_blank_and_the_users_own_note_is_untouched(self):
         entry = _entry(
             exercises=[
                 {
@@ -130,17 +126,8 @@ class TestRpe(unittest.TestCase):
                 }
             ]
         )
-        body, warnings = build_hevy_workout(entry)
-        exercise = body["workout"]["exercises"][0]
-        self.assertEqual("belt on", exercise["notes"])   # the user's own note, untouched
-        self.assertEqual(
-            [
-                "Squat warm-up: RPE 4 can't be stored in Hevy, so it was left blank.",
-                "Squat set 1: RPE 5.5 can't be stored in Hevy, so it was left blank.",
-                "Squat failure set 3: RPE 6.5 can't be stored in Hevy, so it was left blank.",
-            ],
-            warnings,
-        )
+        exercise = build_hevy_workout(entry)["workout"]["exercises"][0]
+        self.assertEqual("belt on", exercise["notes"])
         self.assertEqual([None, None, 7.0, None], [s["rpe"] for s in exercise["sets"]])
 
     def test_rpe_outside_0_to_10_is_rejected(self):
@@ -151,7 +138,7 @@ class TestRpe(unittest.TestCase):
 
     def test_rpe_6_5_is_not_storable_either(self):
         entry = _entry(exercises=[{"exercise_template_id": "t", "sets": [{"reps": 5, "rpe": 6.5}]}])
-        self.assertEqual(1, len(build_hevy_workout(entry)[1]))
+        self.assertIsNone(build_hevy_workout(entry)["workout"]["exercises"][0]["sets"][0]["rpe"])
 
 
 class TestRejections(unittest.TestCase):
