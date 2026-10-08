@@ -5,7 +5,7 @@ Python/FastAPI training planner and workout logger for Wendler 5/3/1 BBB with au
 - **Stack:** Python, FastAPI, stdlib `sqlite3` (no ORM), single-file vanilla-JS frontend (`index.html`)
 - **DB:** path from `DB_PATH` env var; `/data/531bbb.db` in Docker
 - **Tests:** `python -m unittest discover -s tests -t .` (pytest is not installed). `test_session_route.py` pins current session/e1RM behaviour; `expectedFailure` tests there mark known bugs
-- **Infra:** Docker container on Ubuntu homelab (CasaOS), port 8126. Don't alter the CasaOS metadata in `docker-compose.yml`
+- **Infra:** Docker container on Ubuntu homelab (CasaOS), port 8126.
 - **Copilot:** Handles routine coding tasks — defer boilerplate and implementation detail to it
 
 ---
