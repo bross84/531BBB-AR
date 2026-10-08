@@ -140,7 +140,7 @@ class EntrySet(BaseModel):
     type: Literal["warmup", "normal", "failure", "dropset"] = "normal"
     weight_lb: float | None = Field(default=None, ge=0)
     reps: int | None = Field(default=None, ge=0)
-    rpe: float | None = None
+    rpe: float | None = Field(default=None, ge=0, le=10)
 
 
 class EntryExercise(BaseModel):

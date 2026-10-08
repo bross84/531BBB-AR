@@ -178,6 +178,15 @@ class TestCreateHevyWorkout(WorkoutsRouteCase):
         (body,), _ = self.hevy.create_workout.call_args
         self.assertIsNone(body["workout"]["exercises"][0]["sets"][2]["rpe"])
 
+    def test_unstorable_rpe_reaches_hevy_as_a_note(self):
+        self._post()
+        (body,), _ = self.hevy.create_workout.call_args
+        self.assertEqual("RPE Hevy can't store: set 2 @5", body["workout"]["exercises"][0]["notes"])
+
+    def test_rpe_outside_0_to_10_is_422(self):
+        entry = {**ENTRY, "exercises": [{"exercise_template_id": "t", "sets": [{"reps": 5, "rpe": 11}]}]}
+        self.assertEqual(422, self.client.post("/hevy/workouts", json=entry).status_code)
+
     def test_invalid_workout_is_422_and_nothing_is_sent(self):
         for bad in ({"exercises": []}, {"title": " "}, {"end_time": "2026-10-09T16:00:00Z"}):
             r = self._post(**bad)
