@@ -9,7 +9,7 @@ services:
       - 531bbb-data:/data
     environment:
       - DB_PATH=/data/531bbb.db
-      - HEVY_API_KEY=${HEVY_API_KEY}
+      - HEVY_API_KEY=${HEVY_API_KEY:-}
     x-casaos:
       envs:
         - container: DB_PATH
