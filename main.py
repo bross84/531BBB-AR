@@ -5,8 +5,10 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Any, Literal
 
-from fastapi import FastAPI, HTTPException, Response
-from fastapi.responses import FileResponse
+import httpx
+from cryptography.fernet import InvalidToken
+from fastapi import FastAPI, HTTPException, Query, Response
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
@@ -15,8 +17,12 @@ load_dotenv()
 
 from database import get_db, get_rpe_percentage, init_db
 import hevy_client
+import exercise_state
 import program_parser
+import refs_store
 from wave_math import bbb_weight, epley, joker_qualifies, joker_weight, round_weight, session_e1rm, working_weight
+from workout_payload import build_hevy_workout
+from workout_view import summarize_workout
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +35,9 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="531 BBB-AR", lifespan=lifespan)
 
+# Pages change whenever the app is rebuilt, so browsers must re-check them instead of reusing a stored copy.
+NO_CACHE = {"Cache-Control": "no-cache"}
+
 
 @app.get("/health")
 def health():
@@ -37,7 +46,192 @@ def health():
 
 @app.get("/")
 def index():
-    return FileResponse("index.html")
+    # The front door is the workout log. The original multi-tab app is kept, unchanged, at /legacy.
+    return RedirectResponse("/log", headers=NO_CACHE)
+
+
+@app.get("/legacy")
+def legacy_index():
+    return FileResponse("index.html", headers=NO_CACHE)
+
+
+# ── Recent workouts (read from Hevy) ───────────────────────────────────────────
+
+class SetView(BaseModel):
+    index: int | None = None
+    type: str
+    weight_kg: float | None = None
+    weight_lb: float | None = None
+    reps: int | None = None
+    rpe: float | None = None
+    distance_meters: float | None = None
+    duration_seconds: float | None = None
+
+
+class ExerciseView(BaseModel):
+    title: str
+    notes: str | None = None
+    exercise_template_id: str | None = None
+    sets: list[SetView]
+
+
+class WorkoutView(BaseModel):
+    id: str
+    title: str
+    description: str | None = None
+    start_time: str | None = None
+    end_time: str | None = None
+    duration_minutes: int | None = None
+    working_sets: int
+    volume_kg: float
+    exercises: list[ExerciseView]
+
+
+class WorkoutsPage(BaseModel):
+    page: int
+    page_count: int
+    workouts: list[WorkoutView]
+
+
+@app.get("/recent")
+def recent_page():
+    return FileResponse("recent.html", headers=NO_CACHE)
+
+
+def _call_hevy(call):
+    """Run call(HevyClient) and translate Hevy and key failures into HTTP errors."""
+    try:
+        return call(hevy_client.HevyClient())
+    except InvalidToken:
+        raise HTTPException(
+            status_code=400,
+            detail="The stored Hevy API key can't be decrypted. Save it again.",
+        )
+    except ValueError as exc:  # no key stored, or a corrupt Fernet key file
+        raise HTTPException(status_code=400, detail=str(exc))
+    except httpx.HTTPStatusError as exc:
+        status = exc.response.status_code
+        if status in (401, 403):
+            detail = "Hevy rejected the API key. Check that it's current and that your account is Hevy Pro."
+        else:
+            detail = f"Hevy returned an error ({status})."
+            try:
+                message = exc.response.json().get("error")
+            except ValueError:
+                message = None
+            if message:
+                detail += f" {message}"
+        raise HTTPException(status_code=502, detail=detail)
+    except httpx.RequestError:
+        raise HTTPException(status_code=502, detail="Couldn't reach Hevy.")
+
+
+@app.get("/hevy/workouts", response_model=WorkoutsPage)
+def list_hevy_workouts(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=10),  # Hevy allows at most 10 workouts per page
+):
+    data = _call_hevy(lambda client: client.list_workouts(page=page, page_size=page_size))
+    return {
+        "page": int(data.get("page", page)),
+        "page_count": int(data.get("page_count", 1)),
+        "workouts": [summarize_workout(w) for w in data.get("workouts", [])],
+    }
+
+
+# ── Log a workout (write to Hevy) ──────────────────────────────────────────────
+
+class EntrySet(BaseModel):
+    type: Literal["warmup", "normal", "failure", "dropset"] = "normal"
+    weight_lb: float | None = Field(default=None, ge=0)
+    reps: int | None = Field(default=None, ge=0)
+    rpe: float | None = Field(default=None, ge=0, le=10)
+
+
+class EntryExercise(BaseModel):
+    exercise_template_id: str
+    title: str | None = None
+    notes: str | None = None
+    sets: list[EntrySet]
+
+
+class WorkoutEntry(BaseModel):
+    title: str
+    description: str | None = None
+    start_time: str
+    end_time: str
+    exercises: list[EntryExercise]
+
+
+class SavedWorkout(BaseModel):
+    id: str | None = None
+    warnings: list[str]
+
+
+class RpeTable(BaseModel):
+    rows: list[list[float]]  # [rpe, reps, fraction of e1RM], e.g. [8.0, 5, 0.826]
+
+
+class ExerciseRefInput(BaseModel):
+    basis: Literal["e1rm", "tm"] = "e1rm"
+    ls: bool = True  # plan the next set from the last set's e1RM (LSe1RM)
+    tm_pct: float = Field(default=refs_store.DEFAULT_TM_PCT, ge=0.5, le=1.0)
+
+
+class ExerciseRef(ExerciseRefInput):
+    exercise_template_id: str
+
+
+class ExerciseState(BaseModel):
+    found: bool
+    workout_title: str | None = None
+    workout_start_time: str | None = None
+    set_weight_lb: float | None = None
+    set_reps: int | None = None
+    set_rpe: float | None = None
+    e1rm_lb: float | None = None
+
+
+@app.get("/log")
+def log_page():
+    return FileResponse("log.html", headers=NO_CACHE)
+
+
+@app.get("/rpe-table", response_model=RpeTable)
+def get_rpe_table():
+    """The RPE table in use, so the log page can turn an RPE and reps into a percentage of e1RM."""
+    with get_db() as conn:
+        rows = conn.execute("SELECT rpe, reps, percentage FROM rpe_chart ORDER BY rpe DESC, reps").fetchall()
+    return {"rows": [[r["rpe"], r["reps"], r["percentage"]] for r in rows]}
+
+
+@app.get("/exercise-refs", response_model=list[ExerciseRef])
+def list_exercise_refs():
+    return refs_store.list_refs()
+
+
+@app.put("/exercise-refs/{exercise_template_id}", response_model=ExerciseRef)
+def put_exercise_ref(exercise_template_id: str, data: ExerciseRefInput):
+    return refs_store.save_ref(exercise_template_id, data.basis, data.ls, data.tm_pct)
+
+
+@app.get("/hevy/exercise-state/{exercise_template_id}", response_model=ExerciseState)
+def get_exercise_state(exercise_template_id: str):
+    """A movement's current e1RM, worked out from its last session in Hevy with the user's RPE table."""
+    entries = _call_hevy(lambda client: client.exercise_history(exercise_template_id))
+    return exercise_state.build_exercise_state(entries, get_rpe_percentage)
+
+
+@app.post("/hevy/workouts", response_model=SavedWorkout)
+def create_hevy_workout(entry: WorkoutEntry):
+    """Save a logged workout (weights in lb) to Hevy. Hevy has no delete endpoint, so each call
+    that succeeds creates a real workout in the account."""
+    try:
+        body, warnings = build_hevy_workout(entry.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    created = _call_hevy(lambda client: client.create_workout(body))
+    return {"id": created.get("id"), "warnings": warnings}
 
 
 # ── Settings ───────────────────────────────────────────────────────────────────

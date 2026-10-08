@@ -116,6 +116,38 @@ class HevyClient:
 
         return len(exercises)
 
+    def list_workouts(self, page: int = 1, page_size: int = 10) -> dict:
+        """Fetch one page of the account's workouts. Raises on HTTP or network errors."""
+        with httpx.Client(timeout=30) as client:
+            resp = client.get(
+                f"{_BASE_URL}/workouts",
+                headers=self._headers(),
+                params={"page": page, "pageSize": page_size},
+            )
+            resp.raise_for_status()
+            return resp.json()
+
+    def exercise_history(self, exercise_template_id: str) -> list[dict]:
+        """Every logged set for one exercise across all sessions, newest first. Raises on HTTP or network errors."""
+        with httpx.Client(timeout=30) as client:
+            resp = client.get(
+                f"{_BASE_URL}/exercise_history/{exercise_template_id}",
+                headers=self._headers(),
+            )
+            resp.raise_for_status()
+            return resp.json().get("exercise_history") or []
+
+    def create_workout(self, body: dict) -> dict:
+        """Create a workout in Hevy and return it. Raises on HTTP or network errors.
+        Hevy answers 201 with {"workout": [<workout>]} (a single-element list)."""
+        with httpx.Client(timeout=30) as client:
+            resp = client.post(f"{_BASE_URL}/workouts", headers=self._headers(), json=body)
+            resp.raise_for_status()
+            created = resp.json().get("workout")
+        if isinstance(created, list):
+            created = created[0] if created else {}
+        return created or {}
+
     def best_e1rm_from_hevy(self, hevy_exercise_id: str) -> float | None:
         """Page through Hevy workout history and return the highest e1RM for the exercise, or None."""
         from wave_math import epley, round_weight  # local import avoids circular dep

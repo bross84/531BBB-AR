@@ -205,6 +205,8 @@ Squat - 1@8 / 3x5@-10% e1RM [e1rm=rpe]
 23. **The spreadsheet is the reference implementation (user, 2026-10-05):** its formulas define the live calculation. The plan is to read the formulas directly from an exported .xlsx instead of reverse-engineering from screenshots; this resolves bookmarks B and D.
 24. **Build order (updated 2026-10-05):** 0) fix the Hevy write-back to match the spec and make exercise matching strict, 1) parser changes, 2) calculation engine matching the spreadsheet, 3) mobile UI with live recalculation, 4) schema cleanup and rename.
 
+25. **TM percentage (user, 2026-10-08):** a TM is the e1RM of the top set times a percentage. The default is 95% and the user can change it. This matches the user's Hevy history (4 of 4 lifts at about 0.95 of the last microcycle's top-set e1RM). It supersedes the earlier `TM90` example; if a percentage is written next to the `TS` marker it overrides the default (`TS` = 95%, `TS90` = 90%). e1RM and TM are separate numbers: the e1RM is never reduced, and the RPE table converts reps and RPE into a percentage of an e1RM, not of a TM. e1RM and TM are calculated by this app from the user's own RPE table and top set, never from Hevy's displayed e1RM. How a TM becomes a planned set weight is still undecided.
+
 ## Bookmarked discussions (not decided; come back to these)
 
 - **E. Editing a program while a block is active.** Needs edit-in-place for slots (match by day + exercise) that preserves slot ids and logged history, or versioning. Design before the schema work in step 4.

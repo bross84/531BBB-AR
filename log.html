@@ -1,0 +1,708 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Log workout</title>
+  <style>
+    :root {
+      --bg: #f6f5f1; --card: #ffffff; --text: #1d1d1b; --muted: #6b6a64; --line: #e3e1d9;
+      --accent: #1f5fbf; --chip: #eef0f4; --done: #e4f2e4; --done-line: #9ccc9c;
+      --danger: #a32d2d; --danger-bg: #fcebeb; --ok: #1d6b2f; --ok-bg: #e4f2e4; --warn-bg: #fbf0d9; --warn: #7a5200;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #161614; --card: #21211e; --text: #ecebe5; --muted: #a09f97; --line: #34332f;
+        --accent: #7fb0ff; --chip: #2b2c30; --done: #1f3a24; --done-line: #3f7a4a;
+        --danger: #f09595; --danger-bg: #3a1f1f; --ok: #8fd19e; --ok-bg: #1f3a24; --warn-bg: #3a3118; --warn: #e8c66a;
+      }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    main { max-width: 560px; margin: 0 auto; padding: 12px; padding-bottom: 96px; }
+    header { display: flex; justify-content: space-between; align-items: baseline; margin: 6px 0 12px; }
+    h1 { font-size: 22px; font-weight: 500; margin: 0; }
+    a { color: var(--accent); }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin: 0 0 12px; }
+    .muted { color: var(--muted); font-size: 13px; }
+    button, select, input {
+      font: inherit; color: var(--text); min-height: 44px; border-radius: 10px; border: 1px solid var(--line);
+      background: var(--card);
+    }
+    button { padding: 10px 14px; cursor: pointer; }
+    button.primary { background: var(--accent); color: #fff; border-color: transparent; font-weight: 500; }
+    button.wide { width: 100%; }
+    button.link { border: none; background: none; color: var(--muted); min-height: 36px; padding: 6px 4px; font-size: 14px; }
+    button:disabled { opacity: .55; }
+    input[type=text] { width: 100%; padding: 8px 10px; background: var(--bg); }
+    .pick { display: block; width: 100%; text-align: left; margin: 0 0 8px; }
+    .pick small { display: block; color: var(--muted); }
+    .ex-title { font-size: 17px; font-weight: 500; margin: 0 0 2px; }
+    .last { font-size: 13px; color: var(--muted); margin: 0 0 8px; }
+    .cols, .set { display: grid; grid-template-columns: 38px 1fr 1fr 66px 42px; gap: 4px; align-items: center; }
+    .cols { font-size: 11px; color: var(--muted); text-align: center; margin: 0 0 2px; }
+    .set { margin: 0 0 4px; padding: 2px 2px 15px; border-radius: 10px; border: 1px solid transparent; }
+    .set.done { background: var(--done); border-color: var(--done-line); }
+    .set input, .set select { width: 100%; text-align: center; padding: 6px 2px; }
+    .set .kind { padding: 0; font-size: 14px; color: var(--muted); }
+    .wcell { position: relative; min-width: 0; }
+    .wcell .kg { position: absolute; left: 0; right: 0; top: 100%; margin-top: 1px; text-align: center; font-size: 11px; line-height: 1; color: var(--muted); pointer-events: none; }
+    .set .tick { padding: 0; font-size: 20px; }
+    .set.done .tick { background: var(--done-line); color: #fff; border-color: transparent; }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .refbar { margin: 0 0 10px; }
+    .tiles { display: flex; gap: 8px; align-items: stretch; }
+    .tile { flex: 1; min-width: 0; background: var(--chip); border: 1.5px solid transparent; border-radius: 12px; padding: 6px 10px; cursor: pointer; display: flex; flex-direction: column; }
+    .tile .tl { font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 2px; white-space: nowrap; }
+    .tile .tv { font-size: 22px; font-weight: 500; line-height: 1.2; font-variant-numeric: tabular-nums; }
+    .tile.on { border-color: var(--accent); background: transparent; }
+    .tile.on .tv { color: var(--accent); }
+    .tile .pctin { width: 34px; min-height: 0; height: 20px; padding: 0 2px; font-size: 11px; text-align: center; border-radius: 6px; background: var(--bg); }
+    .pill { align-self: center; padding: 8px 12px; min-height: 40px; border-radius: 20px; font-size: 13px; color: var(--muted); }
+    .pill.on { color: var(--accent); border-color: var(--accent); }
+    .set select.actual { border-color: var(--accent); color: var(--accent); }
+    .sec { font-size: 13px; font-weight: 500; color: var(--muted); margin: 14px 0 6px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+    .sq { aspect-ratio: 1 / 1; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start;
+          text-align: left; padding: 9px; min-height: 0; border-radius: 12px; background: var(--card); border: 1px solid var(--line); overflow: hidden; }
+    .sq .t { font-size: 13px; line-height: 1.25; font-weight: 500; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; }
+    .sq .m { font-size: 11px; color: var(--muted); }
+    .sq.recent { border-color: var(--accent); }
+    .hint { font-size: 12px; color: var(--muted); margin: 6px 0 0; }
+    .msg { border-radius: 10px; padding: 10px 12px; margin: 0 0 12px; font-size: 15px; }
+    .msg.error { background: var(--danger-bg); color: var(--danger); }
+    .msg.ok { background: var(--ok-bg); color: var(--ok); }
+    .msg.warn { background: var(--warn-bg); color: var(--warn); }
+    .bar { position: fixed; left: 0; right: 0; bottom: 0; background: var(--bg); border-top: 1px solid var(--line); padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); }
+    .bar > div { max-width: 560px; margin: 0 auto; }
+    .overlay { position: fixed; inset: 0; background: var(--bg); z-index: 5; overflow-y: auto; padding: 12px; }
+    .overlay > div { max-width: 560px; margin: 0 auto; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Log workout</h1>
+    <a href="/recent">Recent</a>
+  </header>
+  <div id="msg"></div>
+
+  <section id="start" hidden>
+    <button id="empty" class="wide" type="button" style="margin-bottom:12px">Start an empty workout</button>
+    <p class="muted" style="margin:0 0 8px">Or copy a recent workout. Its exercises and sets come across as a starting point.</p>
+    <div id="recent"></div>
+  </section>
+
+  <section id="workout" hidden>
+    <div class="card">
+      <input id="title" type="text" aria-label="Workout title" autocomplete="off" />
+      <p id="clock" class="muted" style="margin:6px 0 0"></p>
+      <p class="hint">Before ✓ the RPE plans the weight. Tap ✓ right after the set: the RPE you set then is the one you logged, and the weight stays.</p>
+    </div>
+    <div id="exercises"></div>
+    <button id="addEx" class="wide" type="button">Add exercise</button>
+    <p style="text-align:center;margin:12px 0 0"><button id="discard" class="link" type="button">Discard this workout</button></p>
+  </section>
+
+  <section id="done" hidden>
+    <div class="msg ok">Saved to Hevy.</div>
+    <div id="warnings"></div>
+    <button id="again" class="wide" type="button" style="margin-bottom:8px">Log another workout</button>
+    <p style="text-align:center"><a href="/recent">See it in Recent workouts</a></p>
+  </section>
+</main>
+
+<div id="bar" class="bar" hidden><div><button id="finish" class="primary wide" type="button">Finish and save to Hevy</button></div></div>
+
+<div id="picker" class="overlay" hidden>
+  <div>
+    <div class="row" style="margin-bottom:8px">
+      <input id="search" type="text" placeholder="Search exercises" autocomplete="off" style="flex:1" />
+      <button id="closePicker" type="button">Cancel</button>
+    </div>
+    <p id="syncnote" class="hint" hidden>Updating your exercise list from Hevy…</p>
+    <div id="results"></div>
+  </div>
+</div>
+
+<script>
+  const RPES = [4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10];
+  const KIND = { normal: "", warmup: "W", failure: "F", dropset: "D" };
+  const NEXT_KIND = { normal: "warmup", warmup: "failure", failure: "dropset", dropset: "normal" };
+  const KEY = "logDraft";
+  const $ = (id) => document.getElementById(id);
+  let draft = null, recentPage = null, catalog = null, saving = false;
+  const LB_PER_KG = 2.20462;
+  let rpeTable = new Map(), refs = {};
+  const lbInputs = new WeakMap(), kgLabels = new WeakMap(), refTimers = {}, cardEls = new Map();
+
+  function el(tag, cls, text) { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+  function uid() { return (crypto.randomUUID && crypto.randomUUID()) || String(Date.now()) + Math.random(); }
+  function trim(n) { return String(Number(Number(n).toFixed(2))); }
+
+  function loadDraft() { try { return JSON.parse(localStorage.getItem(KEY)); } catch (e) { return null; } }
+  function saveDraft() {
+    try { localStorage.setItem(KEY, JSON.stringify(draft)); } catch (e) {}
+    if (draft) draft.exercises.forEach(refreshE1rm);
+  }
+  function clearDraft() { draft = null; try { localStorage.removeItem(KEY); } catch (e) {} }
+
+  function say(text, kind) {
+    const box = $("msg"); box.replaceChildren();
+    if (text) box.append(el("div", "msg " + (kind || "error"), text));
+  }
+
+  function show(name) {
+    for (const id of ["start", "workout", "done"]) $(id).hidden = id !== name;
+    $("bar").hidden = name !== "workout";
+    window.scrollTo(0, 0);
+  }
+
+  async function api(path, options) {
+    const res = await fetch(path, options);
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const d = body.detail;
+      const text = Array.isArray(d) ? d.map((x) => x.msg).join("; ") : d;
+      const err = new Error(text || "Something went wrong (" + res.status + ").");
+      err.status = res.status;
+      throw err;
+    }
+    return body;
+  }
+
+  // ── Auto weight: base number x RPE table percentage ─────────────────────────
+  // Weights always fill in from RPE. Per movement two things are chosen: the base (e1RM or TM, both worked
+  // out from the movement's last session in Hevy) and whether the last set's e1RM (LSe1RM) feeds the next set.
+  function pctFor(rpe, reps) { return rpeTable.get(rpe + "|" + reps); }
+  // Round to the nearest 2.5 kg plate step, then show whole pounds (120 kg -> 265 lb).
+  function plateLb(rawLb) { return Math.round(Math.round(rawLb / LB_PER_KG / 2.5) * 2.5 * LB_PER_KG); }
+  // The kg to put on the bar for a weight typed in pounds, to the nearest half kilo (198 lb -> 90 kg).
+  function kgText(lb) {
+    const v = Number(lb);
+    return v > 0 ? trim(Math.round(v / LB_PER_KG * 2) / 2) + " kg" : "";
+  }
+  function showKg(s) { const label = kgLabels.get(s); if (label) label.textContent = kgText(s.lb); }
+  function defaultRef() { return { basis: "e1rm", ls: true, tmPct: 0.95, state: null }; }
+  function refFromServer(id) {
+    const r = refs[id];
+    if (!r) return defaultRef();
+    return { basis: r.basis, ls: r.ls, tmPct: r.tm_pct, state: null };
+  }
+
+  // The e1RM of the nearest earlier set that is ticked done and has weight, reps and an RPE.
+  function lastSetE1rm(ex, index) {
+    for (let j = index - 1; j >= 0; j--) {
+      const p = ex.sets[j];
+      if (!p.done || p.type === "warmup") continue;
+      const lb = parseFloat(p.lb), reps = parseInt(p.reps, 10), rpe = parseFloat(p.arpe || p.rpe);
+      if (!(lb > 0) || !(reps > 0) || isNaN(rpe)) continue;
+      const pct = pctFor(rpe, reps);
+      if (pct) return lb / pct;
+    }
+    return null;
+  }
+
+  // The highest e1RM among the sets ticked done so far (weight / table percentage for the logged RPE), or null.
+  function bestSetToday(ex) {
+    let best = null, working = 0;
+    ex.sets.forEach((s) => {
+      if (s.type !== "warmup") working += 1;
+      if (!s.done || s.type === "warmup") return;
+      const lb = parseFloat(s.lb), reps = parseInt(s.reps, 10), rpe = parseFloat(s.arpe || s.rpe);
+      if (!(lb > 0) || !(reps > 0) || isNaN(rpe)) return;
+      const pct = pctFor(rpe, reps);
+      if (!pct) return;
+      const e1 = lb / pct;
+      if (!best || e1 >= best.e1) best = { e1, set: working, lb, reps, rpe };
+    });
+    return best;
+  }
+
+  // The movement's current e1RM: its best set today, until a set is done the one from the last session.
+  function currentE1rm(ex) {
+    const best = bestSetToday(ex);
+    if (best) return { value: best.e1, best };
+    const st = ex.ref.state;
+    return st && st.found ? { value: st.e1rm_lb, best: null } : null;
+  }
+
+  function refNote(ex) {
+    const cur = currentE1rm(ex), st = ex.ref.state;
+    if (cur && cur.best) {
+      const b = cur.best;
+      return "Best set today (set " + b.set + "): " + Math.round(b.lb) + " lb × " + b.reps + " @" + b.rpe;
+    }
+    if (!st) return "Working out your e1RM from your last session…";
+    if (!st.found) return "No RPE history for this movement yet." + (st.error ? " (" + st.error + ")" : "");
+    const rpe = st.set_rpe != null ? " @" + st.set_rpe : "";
+    return "From " + (st.workout_title || "last session") + ", " + fmtShortDate(st.workout_start_time) + ": " + Math.round(st.set_weight_lb) + " lb × " + st.set_reps + rpe;
+  }
+
+  // Keep the e1RM tile and its note current as sets change, without rebuilding the card.
+  function refreshE1rm(ex) {
+    const card = cardEls.get(ex.id);
+    if (!card) return;
+    const tv = card.querySelector(".e1v"), note = card.querySelector(".refnote");
+    if (!tv || !note) return;
+    const cur = currentE1rm(ex);
+    tv.textContent = cur ? String(Math.round(cur.value)) : (ex.ref.state ? "–" : "…");
+    note.textContent = refNote(ex);
+  }
+
+  function baseFor(ex, index) {
+    if (ex.ref.ls) {
+      const v = lastSetE1rm(ex, index);
+      if (v) return v;
+    }
+    const st = ex.ref.state;
+    if (ex.ref.basis === "tm") return st && st.found ? st.e1rm_lb * ex.ref.tmPct : null;
+    const cur = currentE1rm(ex);
+    return cur ? cur.value : null;
+  }
+
+  function autoWeight(ex, index) {
+    const s = ex.sets[index];
+    const base = baseFor(ex, index), reps = parseInt(s.reps, 10), rpe = parseFloat(s.rpe);
+    if (!base || !(reps > 0) || isNaN(rpe)) return null;
+    const pct = pctFor(rpe, reps);
+    return pct ? plateLb(base * pct) : null;
+  }
+
+  // Fill weights from RPE. Never touches a set that is ticked done or whose weight was typed by hand.
+  function applyAuto(ex, only) {
+    ex.sets.forEach((s, i) => {
+      if (only && s !== only) return;
+      if (s.done || s.manual || s.type === "warmup") return;
+      const w = autoWeight(ex, i);
+      if (w == null) return;
+      s.lb = String(w);
+      const input = lbInputs.get(s);
+      if (input) input.value = s.lb;
+      showKg(s);
+    });
+  }
+
+  function refreshCard(ex) {
+    const old = cardEls.get(ex.id);
+    if (!old || !old.isConnected) return;
+    const fresh = renderExercise(ex);
+    old.replaceWith(fresh);
+    cardEls.set(ex.id, fresh);
+  }
+
+  async function loadState(ex) {
+    try {
+      ex.ref.state = await api("/hevy/exercise-state/" + encodeURIComponent(ex.template_id));
+    } catch (err) {
+      ex.ref.state = { found: false, error: err.message };
+    }
+    applyAuto(ex); saveDraft(); refreshCard(ex);
+  }
+
+  function saveRef(ex) {
+    const id = ex.template_id;
+    clearTimeout(refTimers[id]);
+    refTimers[id] = setTimeout(async () => {
+      const body = { basis: ex.ref.basis, ls: ex.ref.ls, tm_pct: ex.ref.tmPct };
+      try {
+        refs[id] = await api("/exercise-refs/" + encodeURIComponent(id), {
+          method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+        });
+      } catch (err) { /* the draft still holds it; it is saved again on the next change */ }
+    }, 600);
+  }
+
+  async function loadReference() {
+    try {
+      const [table, list] = await Promise.all([api("/rpe-table"), api("/exercise-refs")]);
+      rpeTable = new Map(table.rows.map((r) => [r[0] + "|" + r[1], r[2]]));
+      refs = Object.fromEntries(list.map((r) => [r.exercise_template_id, r]));
+    } catch (err) { /* weights simply stay as they are */ }
+  }
+
+  // ── Start screen ────────────────────────────────────────────────────────────
+  function fmtDate(iso) {
+    const d = new Date(iso);
+    return isNaN(d) ? "" : d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+  }
+
+  async function renderStart() {
+    show("start");
+    const box = $("recent"); box.replaceChildren(el("p", "muted", "Loading recent workouts…"));
+    try {
+      recentPage = recentPage || (await api("/hevy/workouts?page=1&page_size=10"));
+      box.replaceChildren();
+      for (const w of recentPage.workouts) {
+        const b = el("button", "pick");
+        b.type = "button";
+        b.append(el("span", null, w.title), el("small", null, fmtDate(w.start_time) + " · " + w.exercises.length + " exercises"));
+        b.addEventListener("click", () => startFrom(w));
+        box.append(b);
+      }
+      if (!recentPage.workouts.length) box.replaceChildren(el("p", "muted", "No workouts in Hevy yet."));
+    } catch (err) {
+      box.replaceChildren();
+      say(err.message + (err.status === 400 ? " Save your Hevy key on the Recent page first." : ""));
+    }
+  }
+
+  function lastSummary(sets) {
+    const work = sets.filter((s) => s.type !== "warmup" && s.weight_lb != null);
+    if (!work.length) return null;
+    const parts = work.slice(0, 4).map((s) => Math.round(s.weight_lb) + "×" + (s.reps ?? "?") + (s.rpe != null ? "@" + s.rpe : ""));
+    return "Last: " + parts.join(", ") + (work.length > 4 ? "…" : "");
+  }
+
+  function startFrom(w) {
+    draft = {
+      title: w.title,
+      startedAt: new Date().toISOString(),
+      exercises: w.exercises.map((ex) => ({
+        id: uid(),
+        template_id: ex.exercise_template_id,
+        title: ex.title,
+        notes: "",
+        last: lastSummary(ex.sets),
+        ref: refFromServer(ex.exercise_template_id),
+        sets: ex.sets.map((s) => ({
+          type: s.type || "normal",
+          lb: s.weight_lb != null ? trim(Math.round(s.weight_lb * 2) / 2) : "",
+          reps: s.reps != null ? String(s.reps) : "",
+          rpe: RPES.includes(s.rpe) ? String(s.rpe) : "",
+          done: false,
+          manual: false,
+        })),
+      })).filter((ex) => ex.template_id),
+    };
+    saveDraft(); say(""); renderWorkout();
+    draft.exercises.forEach(loadState);
+  }
+
+  function startEmpty() {
+    draft = { title: "Workout", startedAt: new Date().toISOString(), exercises: [] };
+    saveDraft(); say(""); renderWorkout();
+  }
+
+  // ── Workout screen ──────────────────────────────────────────────────────────
+  function renderWorkout() {
+    show("workout");
+    $("title").value = draft.title;
+    const list = $("exercises"); list.replaceChildren();
+    cardEls.clear();
+    for (const ex of draft.exercises) { const card = renderExercise(ex); cardEls.set(ex.id, card); list.append(card); }
+    tickClock();
+  }
+
+  function fmtShortDate(iso) {
+    const d = new Date(iso);
+    return isNaN(d) ? "" : d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  }
+
+  function renderRefBar(ex) {
+    const wrap = el("div", "refbar");
+    const st = ex.ref.state, found = !!(st && st.found);
+    const show = (v) => (v != null ? String(v) : !st ? "…" : "–");
+
+    const tiles = el("div", "tiles");
+    const tile = (key, label, value) => {
+      const t = el("div", "tile" + (ex.ref.basis === key ? " on" : ""));
+      t.setAttribute("role", "radio"); t.setAttribute("aria-checked", String(ex.ref.basis === key)); t.tabIndex = 0;
+      t.append(label, el("span", "tv", value));
+      const choose = () => {
+        if (ex.ref.basis === key) return;
+        ex.ref.basis = key; applyAuto(ex); saveDraft(); saveRef(ex); refreshCard(ex);
+      };
+      t.addEventListener("click", choose);
+      t.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); choose(); } });
+      return t;
+    };
+
+    const cur = currentE1rm(ex);
+    const e1Tile = tile("e1rm", el("span", "tl", "e1RM"), show(cur ? Math.round(cur.value) : null));
+    e1Tile.querySelector(".tv").classList.add("e1v");
+    tiles.append(e1Tile);
+
+    const tmLabel = el("span", "tl");
+    tmLabel.append("TM ");
+    const pct = el("input", "pctin"); pct.type = "text"; pct.inputMode = "decimal";
+    pct.value = trim(ex.ref.tmPct * 100); pct.setAttribute("aria-label", "TM as a percentage of e1RM");
+    pct.addEventListener("click", (e) => e.stopPropagation());
+    tmLabel.append(pct, "%");
+    const tmTile = tile("tm", tmLabel, show(found ? Math.round(st.e1rm_lb * ex.ref.tmPct) : null));
+    pct.addEventListener("input", () => {
+      const v = Number(pct.value) / 100;
+      if (!(v >= 0.5 && v <= 1)) return;
+      ex.ref.tmPct = v; applyAuto(ex); saveDraft(); saveRef(ex);
+      if (found) tmTile.querySelector(".tv").textContent = String(Math.round(st.e1rm_lb * v));
+    });
+    tiles.append(tmTile);
+
+    const ls = el("button", "pill" + (ex.ref.ls ? " on" : ""), "LSe1RM");
+    ls.type = "button"; ls.setAttribute("aria-pressed", String(ex.ref.ls));
+    ls.title = "Plan each set from the e1RM of the last set you ticked. Off: every set uses the e1RM or TM selected here.";
+    ls.addEventListener("click", () => { ex.ref.ls = !ex.ref.ls; applyAuto(ex); saveDraft(); saveRef(ex); refreshCard(ex); });
+    tiles.append(ls);
+    wrap.append(tiles);
+
+    wrap.append(el("p", "hint refnote", refNote(ex)));
+    return wrap;
+  }
+
+  function renderExercise(ex) {
+    const card = el("section", "card");
+    card.append(el("p", "ex-title", ex.title));
+    if (ex.last) card.append(el("p", "last", ex.last));
+    card.append(renderRefBar(ex));
+    const cols = el("div", "cols");
+    for (const t of ["", "lb", "reps", "RPE", ""]) cols.append(el("span", null, t));
+    card.append(cols);
+
+    let working = 0;
+    ex.sets.forEach((s) => {
+      if (s.type !== "warmup") working += 1;
+      const row = el("div", "set" + (s.done ? " done" : ""));
+      const kind = el("button", "kind", s.type === "normal" ? String(working) : KIND[s.type]);
+      kind.type = "button"; kind.setAttribute("aria-label", "Set type: " + s.type);
+      kind.addEventListener("click", () => { s.type = NEXT_KIND[s.type]; saveDraft(); renderWorkout(); });
+
+      const lb = el("input"); lb.type = "text"; lb.inputMode = "decimal"; lb.value = s.lb; lb.setAttribute("aria-label", "Weight in pounds");
+      const kgLabel = el("span", "kg"), wcell = el("div", "wcell");
+      wcell.append(lb, kgLabel);
+      lbInputs.set(s, lb); kgLabels.set(s, kgLabel); showKg(s);
+      lb.addEventListener("change", () => {   // typing "90kg" converts to pounds
+        const m = lb.value.trim().match(/^([\d.]+)\s*kg$/i);
+        if (!m) return;
+        s.lb = String(Math.round(parseFloat(m[1]) * LB_PER_KG)); lb.value = s.lb; s.manual = true; showKg(s);
+        if (s.done) applyAuto(ex);
+        saveDraft();
+      });
+      lb.addEventListener("input", () => {
+        s.lb = lb.value; s.manual = lb.value.trim() !== ""; showKg(s);
+        if (s.done) applyAuto(ex);                // a logged set changed: re-plan the sets after it
+        else if (!s.manual) applyAuto(ex, s);     // clearing the box hands the weight back to auto
+        saveDraft();
+      });
+      const reps = el("input"); reps.type = "text"; reps.inputMode = "numeric"; reps.value = s.reps; reps.setAttribute("aria-label", "Reps");
+      reps.addEventListener("input", () => { s.reps = reps.value; applyAuto(ex, s.done ? null : s); saveDraft(); });
+
+      const rpe = el("select"); rpe.setAttribute("aria-label", "RPE");
+      for (const v of [""].concat(RPES)) { const o = el("option", null, v === "" ? "–" : String(v)); o.value = String(v); rpe.append(o); }
+      rpe.value = s.done ? (s.arpe || s.rpe) : s.rpe;
+      if (s.done) rpe.classList.add("actual");
+      rpe.addEventListener("change", () => {
+        if (s.done) { s.arpe = rpe.value; applyAuto(ex); }   // the RPE you logged: the weight stays
+        else { s.rpe = rpe.value; applyAuto(ex, s); }        // the plan: the weight follows it
+        saveDraft();
+      });
+
+      const tick = el("button", "tick", "✓");
+      tick.type = "button"; tick.setAttribute("aria-label", "Mark set done");
+      tick.addEventListener("click", () => {
+        s.done = !s.done;
+        if (s.done && !s.arpe) s.arpe = s.rpe;   // from here the RPE box is the RPE you logged
+        row.classList.toggle("done", s.done);
+        rpe.value = s.done ? (s.arpe || s.rpe) : s.rpe;
+        rpe.classList.toggle("actual", s.done);
+        applyAuto(ex); saveDraft();
+      });
+
+      row.append(kind, wcell, reps, rpe, tick);
+      card.append(row);
+    });
+
+    const actions = el("div", "row");
+    const add = el("button", null, "Add set"); add.type = "button";
+    add.addEventListener("click", () => {
+      const prev = ex.sets[ex.sets.length - 1];
+      const next = { type: "normal", lb: prev ? prev.lb : "", reps: prev ? prev.reps : "", rpe: prev ? prev.rpe : "", done: false, manual: false };
+      ex.sets.push(next);
+      applyAuto(ex, next);
+      saveDraft(); renderWorkout();
+    });
+    const del = el("button", "link", "Remove last set"); del.type = "button";
+    del.addEventListener("click", () => { ex.sets.pop(); saveDraft(); renderWorkout(); });
+    const rm = el("button", "link", "Remove exercise"); rm.type = "button";
+    rm.addEventListener("click", () => {
+      if (!confirm("Remove " + ex.title + " from this workout?")) return;
+      draft.exercises = draft.exercises.filter((e) => e.id !== ex.id); saveDraft(); renderWorkout();
+    });
+    actions.append(add, del, rm);
+    card.append(actions);
+    return card;
+  }
+
+  function tickClock() {
+    if (!draft) return;
+    const start = new Date(draft.startedAt);
+    const mins = Math.max(0, Math.round((Date.now() - start) / 60000));
+    $("clock").textContent = "Started " + start.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) + " · " + mins + " min";
+  }
+  setInterval(() => { if (!$("workout").hidden) tickClock(); }, 30000);
+
+  $("title").addEventListener("input", () => { draft.title = $("title").value; saveDraft(); });
+  $("empty").addEventListener("click", startEmpty);
+  $("discard").addEventListener("click", () => {
+    if (!confirm("Discard this workout? Nothing has been saved to Hevy.")) return;
+    clearDraft(); say(""); renderStart();
+  });
+  $("again").addEventListener("click", () => { say(""); renderStart(); });
+
+  // ── Add exercise ────────────────────────────────────────────────────────────
+  let refreshTried = false;
+
+  // Exercises from your recent Hevy workouts, most recently used first, each once.
+  function recentExercises() {
+    const seen = new Set(), list = [];
+    for (const w of (recentPage ? recentPage.workouts : [])) {
+      for (const ex of w.exercises) {
+        const id = ex.exercise_template_id;
+        if (!id || seen.has(id)) continue;
+        seen.add(id);
+        list.push({ id, title: ex.title });
+      }
+    }
+    return list;
+  }
+
+  function addExercise(e) {
+    const added = { id: uid(), template_id: e.id, title: e.title, notes: "", last: null, ref: refFromServer(e.id),
+      sets: [{ type: "normal", lb: "", reps: "", rpe: "", done: false, manual: false }] };
+    draft.exercises.push(added);
+    saveDraft(); $("picker").hidden = true; renderWorkout();
+    loadState(added);
+  }
+
+  function squareCard(e, isRecent, muscle) {
+    const b = el("button", "sq" + (isRecent ? " recent" : "")); b.type = "button"; b.title = e.title;
+    b.append(el("span", "t", e.title), el("span", "m", muscle || ""));
+    b.addEventListener("click", () => addExercise(e));
+    return b;
+  }
+
+  function section(box, title, items, recentIds, muscleOf) {
+    if (!items.length) return;
+    box.append(el("p", "sec", title));
+    const grid = el("div", "grid");
+    for (const e of items) grid.append(squareCard(e, recentIds.has(e.id), muscleOf(e.id)));
+    box.append(grid);
+  }
+
+  function renderResults() {
+    const box = $("results"); box.replaceChildren();
+    if (!catalog.length) {
+      box.append(el("p", "muted", "No exercises cached yet. Pull your exercise list from Hevy first."));
+      const sync = el("button", "wide", "Sync exercises from Hevy"); sync.type = "button";
+      sync.addEventListener("click", async () => {
+        sync.disabled = true; sync.textContent = "Syncing…";
+        try { await api("/exercises/sync", { method: "POST" }); catalog = await api("/exercises"); renderResults(); }
+        catch (err) { sync.disabled = false; sync.textContent = "Sync exercises from Hevy"; say(err.message); }
+      });
+      box.append(sync); return;
+    }
+    const muscles = new Map(catalog.map((e) => [e.id, e.primary_muscle]));
+    const muscleOf = (id) => muscles.get(id) || "";
+    const recents = recentExercises();
+    const recentIds = new Set(recents.map((e) => e.id));
+    const terms = $("search").value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+
+    if (!terms.length) {
+      section(box, "Recent", recents, recentIds, muscleOf);
+      section(box, "All exercises (" + catalog.length + ")", catalog, recentIds, muscleOf);
+      return;
+    }
+    // Every word must appear in the title. Recent exercises first, then titles starting with the first word.
+    const hit = (title) => { const t = title.toLowerCase(); return terms.every((x) => t.includes(x)); };
+    const pool = new Map();
+    for (const e of recents) if (hit(e.title)) pool.set(e.id, e);
+    for (const e of catalog) if (hit(e.title) && !pool.has(e.id)) pool.set(e.id, e);
+    const rank = (e) => (recentIds.has(e.id) ? 0 : e.title.toLowerCase().startsWith(terms[0]) ? 1 : 2);
+    const results = [...pool.values()].sort((a, b) => rank(a) - rank(b));
+    if (!results.length) { box.append(el("p", "muted", "No matches.")); return; }
+    section(box, "Results (" + results.length + ")", results, recentIds, muscleOf);
+  }
+
+  // Hevy's list changes (new custom exercises), so refresh the stored copy when it is old.
+  async function refreshCatalogIfStale() {
+    if (refreshTried) return;
+    const stamps = catalog.map((e) => Date.parse(String(e.cached_at).replace(" ", "T") + "Z")).filter((x) => !isNaN(x));
+    const newest = stamps.length ? Math.max(...stamps) : 0;
+    if (catalog.length && Date.now() - newest < 12 * 3600 * 1000) return;
+    refreshTried = true;
+    $("syncnote").hidden = false;
+    try { await api("/exercises/sync", { method: "POST" }); catalog = await api("/exercises"); }
+    catch (err) { /* keep the stored list */ }
+    finally { $("syncnote").hidden = true; }
+    renderResults();
+  }
+
+  async function openPicker() {
+    $("picker").hidden = false; $("search").value = "";
+    $("results").replaceChildren(el("p", "muted", "Loading exercises…"));
+    try { catalog = catalog || (await api("/exercises")); } catch (err) { catalog = []; }
+    if (!recentPage) { try { recentPage = await api("/hevy/workouts?page=1&page_size=10"); } catch (err) { /* no recents */ } }
+    renderResults(); $("search").focus();
+    refreshCatalogIfStale();
+  }
+
+  $("addEx").addEventListener("click", openPicker);
+  $("closePicker").addEventListener("click", () => { $("picker").hidden = true; });
+  $("search").addEventListener("input", renderResults);
+
+  // ── Finish ──────────────────────────────────────────────────────────────────
+  function buildEntry() {
+    const exercises = [];
+    for (const ex of draft.exercises) {
+      const sets = [];
+      for (const [i, s] of ex.sets.entries()) {
+        if (!s.done) continue;
+        const where = ex.title + " (row " + (i + 1) + ")";
+        const reps = s.reps.trim() === "" ? NaN : Number(s.reps);
+        if (!Number.isInteger(reps) || reps < 0) throw new Error(where + ": enter the reps you did.");
+        const lb = s.lb.trim() === "" ? null : Number(s.lb);
+        if (lb !== null && (isNaN(lb) || lb < 0)) throw new Error(where + ": the weight isn't a number.");
+        const logged = s.arpe || s.rpe;
+        sets.push({ type: s.type, weight_lb: lb, reps, rpe: !logged ? null : Number(logged) });
+      }
+      if (sets.length) exercises.push({ exercise_template_id: ex.template_id, title: ex.title, notes: ex.notes, sets });
+    }
+    if (!exercises.length) throw new Error("Tap ✓ on each set you did before saving.");
+    return { title: draft.title.trim() || "Workout", start_time: draft.startedAt, end_time: new Date().toISOString(), exercises };
+  }
+
+  $("finish").addEventListener("click", async () => {
+    if (saving) return;
+    let entry;
+    try { entry = buildEntry(); } catch (err) { say(err.message); window.scrollTo(0, 0); return; }
+    saving = true; $("finish").disabled = true; $("finish").textContent = "Saving…"; say("");
+    try {
+      const saved = await api("/hevy/workouts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(entry) });
+      clearDraft();
+      const box = $("warnings"); box.replaceChildren();
+      for (const w of saved.warnings) box.append(el("div", "msg warn", w));
+      show("done");
+    } catch (err) {
+      say(err.message + " Your workout is still here. If you're not sure it saved, check Recent workouts before trying again.");
+      window.scrollTo(0, 0);
+    } finally {
+      saving = false; $("finish").disabled = false; $("finish").textContent = "Finish and save to Hevy";
+    }
+  });
+
+  // ── Boot ────────────────────────────────────────────────────────────────────
+  loadReference().then(() => {
+    draft = loadDraft();
+    if (draft && Array.isArray(draft.exercises)) {
+      for (const ex of draft.exercises) {
+        const old = ex.ref || {};
+        ex.ref = { basis: old.basis || "e1rm", ls: old.ls === undefined ? true : old.ls, tmPct: old.tmPct || 0.95, state: old.state || null };
+        for (const s of ex.sets) if (s.manual === undefined) s.manual = false;
+      }
+      renderWorkout();
+      draft.exercises.filter((ex) => !ex.ref.state).forEach(loadState);
+    } else { draft = null; renderStart(); }
+  });
+</script>
+</body>
+</html>

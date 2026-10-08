@@ -192,8 +192,10 @@ cython_debug/
 # Docker
 docker-compose.override.yml
 
-# CasaOS / deployment
-data/
+# CasaOS / deployment: ignore everything in data/ (databases, keys) except the RPE tables the app needs to start
+data/*
+!data/rpe_chart.csv
+!data/rpe_chart_user.csv
 
 # Python
 __pycache__/
