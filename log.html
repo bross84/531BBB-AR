@@ -45,6 +45,8 @@
     .set.done { background: var(--done); border-color: var(--done-line); }
     .set input, .set select { width: 100%; text-align: center; padding: 6px 2px; }
     .set .kind { padding: 0; font-size: 14px; color: var(--muted); }
+    .wcell { display: flex; flex-direction: column; align-items: center; min-width: 0; }
+    .wcell .kg { font-size: 11px; color: var(--muted); line-height: 1.1; margin-top: 2px; min-height: 12px; }
     .set .tick { padding: 0; font-size: 20px; }
     .set.done .tick { background: var(--done-line); color: #fff; border-color: transparent; }
     .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
@@ -133,7 +135,7 @@
   let draft = null, recentPage = null, catalog = null, saving = false;
   const LB_PER_KG = 2.20462;
   let rpeTable = new Map(), refs = {};
-  const lbInputs = new WeakMap(), refTimers = {}, cardEls = new Map();
+  const lbInputs = new WeakMap(), kgLabels = new WeakMap(), refTimers = {}, cardEls = new Map();
 
   function el(tag, cls, text) { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
   function uid() { return (crypto.randomUUID && crypto.randomUUID()) || String(Date.now()) + Math.random(); }
@@ -173,6 +175,12 @@
   function pctFor(rpe, reps) { return rpeTable.get(rpe + "|" + reps); }
   // Round to the nearest 2.5 kg plate step, then show whole pounds (120 kg -> 265 lb).
   function plateLb(rawLb) { return Math.round(Math.round(rawLb / LB_PER_KG / 2.5) * 2.5 * LB_PER_KG); }
+  // The kg to put on the bar for a weight typed in pounds, to the nearest half kilo (198 lb -> 90 kg).
+  function kgText(lb) {
+    const v = Number(lb);
+    return v > 0 ? trim(Math.round(v / LB_PER_KG * 2) / 2) + " kg" : "";
+  }
+  function showKg(s) { const label = kgLabels.get(s); if (label) label.textContent = kgText(s.lb); }
   function defaultRef() { return { basis: "e1rm", ls: true, tmPct: 0.95, state: null }; }
   function refFromServer(id) {
     const r = refs[id];
@@ -221,6 +229,7 @@
       s.lb = String(w);
       const input = lbInputs.get(s);
       if (input) input.value = s.lb;
+      showKg(s);
     });
   }
 
@@ -412,9 +421,18 @@
       kind.addEventListener("click", () => { s.type = NEXT_KIND[s.type]; saveDraft(); renderWorkout(); });
 
       const lb = el("input"); lb.type = "text"; lb.inputMode = "decimal"; lb.value = s.lb; lb.setAttribute("aria-label", "Weight in pounds");
-      lbInputs.set(s, lb);
+      const kgLabel = el("span", "kg"), wcell = el("div", "wcell");
+      wcell.append(lb, kgLabel);
+      lbInputs.set(s, lb); kgLabels.set(s, kgLabel); showKg(s);
+      lb.addEventListener("change", () => {   // typing "90kg" converts to pounds
+        const m = lb.value.trim().match(/^([\d.]+)\s*kg$/i);
+        if (!m) return;
+        s.lb = String(Math.round(parseFloat(m[1]) * LB_PER_KG)); lb.value = s.lb; s.manual = true; showKg(s);
+        if (s.done) applyAuto(ex);
+        saveDraft();
+      });
       lb.addEventListener("input", () => {
-        s.lb = lb.value; s.manual = lb.value.trim() !== "";
+        s.lb = lb.value; s.manual = lb.value.trim() !== ""; showKg(s);
         if (s.done) applyAuto(ex);                // a logged set changed: re-plan the sets after it
         else if (!s.manual) applyAuto(ex, s);     // clearing the box hands the weight back to auto
         saveDraft();
@@ -443,7 +461,7 @@
         applyAuto(ex); saveDraft();
       });
 
-      row.append(kind, lb, reps, rpe, tick);
+      row.append(kind, wcell, reps, rpe, tick);
       card.append(row);
     });
 
