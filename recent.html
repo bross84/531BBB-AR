@@ -61,7 +61,10 @@
 </head>
 <body>
 <main>
-  <h1>Recent workouts</h1>
+  <div style="display:flex;justify-content:space-between;align-items:baseline">
+    <h1>Recent workouts</h1>
+    <a href="/log" style="color:var(--accent)">Log workout</a>
+  </div>
   <div id="status"></div>
   <div id="keyform" class="card" hidden>
     <p class="note" style="margin-top:0">Paste your Hevy API key (needs Hevy Pro). It's stored encrypted on this server and never shown again.</p>

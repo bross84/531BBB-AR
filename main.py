@@ -8,7 +8,7 @@ from typing import Any, Literal
 import httpx
 from cryptography.fernet import InvalidToken
 from fastapi import FastAPI, HTTPException, Query, Response
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
@@ -41,6 +41,12 @@ def health():
 
 @app.get("/")
 def index():
+    # The front door is the workout log. The original multi-tab app is kept, unchanged, at /legacy.
+    return RedirectResponse("/log")
+
+
+@app.get("/legacy")
+def legacy_index():
     return FileResponse("index.html")
 
 
