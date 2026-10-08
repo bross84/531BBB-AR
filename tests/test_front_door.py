@@ -41,6 +41,11 @@ class TestFrontDoor(unittest.TestCase):
         self.assertIn('href="/log"', self.client.get("/recent").text)
         self.assertIn('href="/recent"', self.client.get("/log").text)
 
+    def test_pages_tell_browsers_to_recheck_instead_of_reusing_a_stored_copy(self):
+        for path in ("/log", "/recent", "/legacy"):
+            self.assertEqual("no-cache", self.client.get(path).headers["cache-control"], path)
+        self.assertEqual("no-cache", self.client.get("/", follow_redirects=False).headers["cache-control"])
+
 
 if __name__ == "__main__":
     unittest.main()

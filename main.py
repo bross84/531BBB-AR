@@ -35,6 +35,9 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="531 BBB-AR", lifespan=lifespan)
 
+# Pages change whenever the app is rebuilt, so browsers must re-check them instead of reusing a stored copy.
+NO_CACHE = {"Cache-Control": "no-cache"}
+
 
 @app.get("/health")
 def health():
@@ -44,12 +47,12 @@ def health():
 @app.get("/")
 def index():
     # The front door is the workout log. The original multi-tab app is kept, unchanged, at /legacy.
-    return RedirectResponse("/log")
+    return RedirectResponse("/log", headers=NO_CACHE)
 
 
 @app.get("/legacy")
 def legacy_index():
-    return FileResponse("index.html")
+    return FileResponse("index.html", headers=NO_CACHE)
 
 
 # ── Recent workouts (read from Hevy) ───────────────────────────────────────────
@@ -92,7 +95,7 @@ class WorkoutsPage(BaseModel):
 
 @app.get("/recent")
 def recent_page():
-    return FileResponse("recent.html")
+    return FileResponse("recent.html", headers=NO_CACHE)
 
 
 def _call_hevy(call):
@@ -191,7 +194,7 @@ class ExerciseState(BaseModel):
 
 @app.get("/log")
 def log_page():
-    return FileResponse("log.html")
+    return FileResponse("log.html", headers=NO_CACHE)
 
 
 @app.get("/rpe-table", response_model=RpeTable)
