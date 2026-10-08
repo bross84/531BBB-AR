@@ -36,7 +36,7 @@ Workout set (POST body): `type`, `weight_kg`, `reps`, `rpe`, `distance_meters`, 
 - optional: `description`, `is_private`
 - each exercise: `exercise_template_id`, `sets[]`, optional `notes`, `superset_id`
 
-Hevy has no "in-progress workout": a workout is posted complete.
+Hevy has no "in-progress workout": a workout is posted complete. The 201 response is `{"workout": [<workout>]}`, a single-element array (not an object). Hevy numbers RPE as 6, 7, 7.5, 8, 8.5, 9, 9.5, 10 only.
 
 ## Exercises
 
@@ -49,6 +49,7 @@ Template fields: `id`, `title`, `type`, `primary_muscle_group`, `secondary_muscl
 3. History is never read except `best_e1rm_from_hevy`, which is unused after the June change.
 4. `workouts/events` is not used, so the local cache of Hevy data is never refreshed incrementally.
 5. RPE below 6 (used in the user's programs) has no Hevy representation.
+6. `HevyClient.post_workout` reads the 201 response as an object (`.get("workout", {}).get("id")`), but Hevy returns a list, so even a valid request would lose the workout id.
 
 ## Existing AI tooling (web search 2026-10-05; listings read, code NOT audited)
 
