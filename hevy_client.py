@@ -116,6 +116,17 @@ class HevyClient:
 
         return len(exercises)
 
+    def list_workouts(self, page: int = 1, page_size: int = 10) -> dict:
+        """Fetch one page of the account's workouts. Raises on HTTP or network errors."""
+        with httpx.Client(timeout=30) as client:
+            resp = client.get(
+                f"{_BASE_URL}/workouts",
+                headers=self._headers(),
+                params={"page": page, "pageSize": page_size},
+            )
+            resp.raise_for_status()
+            return resp.json()
+
     def best_e1rm_from_hevy(self, hevy_exercise_id: str) -> float | None:
         """Page through Hevy workout history and return the highest e1RM for the exercise, or None."""
         from wave_math import epley, round_weight  # local import avoids circular dep

@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Recent workouts</title>
+  <style>
+    :root {
+      --bg: #f6f5f1; --card: #ffffff; --text: #1d1d1b; --muted: #6b6a64;
+      --line: #e3e1d9; --accent: #1f5fbf; --chip: #eef0f4; --warm: #f1efe8;
+      --danger: #a32d2d; --danger-bg: #fcebeb;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #161614; --card: #21211e; --text: #ecebe5; --muted: #a09f97;
+        --line: #34332f; --accent: #7fb0ff; --chip: #2b2c30; --warm: #2a2926;
+        --danger: #f09595; --danger-bg: #3a1f1f;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    main { max-width: 640px; margin: 0 auto; padding: 16px; }
+    h1 { font-size: 22px; font-weight: 500; margin: 8px 0 16px; }
+    .card {
+      background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+      padding: 14px 16px; margin: 0 0 12px;
+    }
+    .wk-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+    .wk-title { font-size: 17px; font-weight: 500; margin: 0; }
+    .wk-when { font-size: 13px; color: var(--muted); white-space: nowrap; }
+    .wk-meta { font-size: 13px; color: var(--muted); margin: 2px 0 10px; }
+    .ex { border-top: 1px solid var(--line); padding: 10px 0 2px; }
+    .ex-title { font-size: 15px; font-weight: 500; margin: 0 0 6px; }
+    .ex-notes { font-size: 13px; color: var(--muted); margin: 0 0 6px; }
+    .sets { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; padding: 0; list-style: none; }
+    .set {
+      background: var(--chip); border-radius: 8px; padding: 4px 9px; font-size: 14px;
+      font-variant-numeric: tabular-nums;
+    }
+    .set.warmup { background: transparent; border: 1px dashed var(--line); color: var(--muted); }
+    .set .tag { font-size: 11px; color: var(--muted); margin-right: 4px; }
+    .set .rpe { color: var(--accent); margin-left: 4px; }
+    .set .kg { color: var(--muted); font-size: 12px; }
+    button {
+      font: inherit; padding: 12px 16px; border-radius: 10px; border: 1px solid var(--line);
+      background: var(--card); color: var(--text); width: 100%; cursor: pointer; min-height: 48px;
+    }
+    button:disabled { opacity: .6; cursor: default; }
+    button.primary { background: var(--accent); color: #fff; border-color: transparent; }
+    input[type=password], input[type=text] {
+      font: inherit; width: 100%; padding: 12px; border-radius: 10px; margin: 8px 0;
+      border: 1px solid var(--line); background: var(--bg); color: var(--text); min-height: 48px;
+    }
+    .note { font-size: 14px; color: var(--muted); }
+    .error { background: var(--danger-bg); color: var(--danger); border-radius: 10px; padding: 10px 12px; margin: 0 0 12px; }
+    .empty { text-align: center; color: var(--muted); padding: 32px 0; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Recent workouts</h1>
+  <div id="status"></div>
+  <div id="keyform" class="card" hidden>
+    <p class="note" style="margin-top:0">Paste your Hevy API key (needs Hevy Pro). It's stored encrypted on this server and never shown again.</p>
+    <input id="keyinput" type="password" autocomplete="off" placeholder="Hevy API key" />
+    <button id="keysave" class="primary" type="button">Save key</button>
+  </div>
+  <div id="list"></div>
+  <button id="more" type="button" hidden>Load older workouts</button>
+</main>
+
+<script>
+  const state = { page: 0, pageCount: 1, loading: false };
+  const $ = (id) => document.getElementById(id);
+
+  function el(tag, cls, text) {
+    const node = document.createElement(tag);
+    if (cls) node.className = cls;
+    if (text != null) node.textContent = text;
+    return node;
+  }
+
+  function trim(n) { return String(Number(n.toFixed(2))); }
+
+  function fmtWhen(iso) {
+    const d = new Date(iso);
+    if (isNaN(d)) return "";
+    const day = d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+    const days = Math.floor((new Date().setHours(0, 0, 0, 0) - new Date(d).setHours(0, 0, 0, 0)) / 86400000);
+    const rel = days <= 0 ? "today" : days === 1 ? "yesterday" : days + " days ago";
+    return day + " · " + rel;
+  }
+
+  function fmtLoad(s) {
+    if (s.weight_kg != null) return Math.round(s.weight_lb) + " lb";
+    if (s.reps != null && s.distance_meters == null && s.duration_seconds == null) return "BW";
+    return "";
+  }
+
+  function fmtEffort(s) {
+    const parts = [];
+    if (s.reps != null) parts.push("× " + s.reps);
+    if (s.duration_seconds != null) parts.push(Math.round(s.duration_seconds / 60 * 10) / 10 + " min");
+    if (s.distance_meters != null) parts.push(trim(s.distance_meters) + " m");
+    return parts.join(" ");
+  }
+
+  function renderWorkout(w) {
+    const card = el("section", "card");
+    const head = el("div", "wk-head");
+    head.append(el("h2", "wk-title", w.title), el("span", "wk-when", fmtWhen(w.start_time)));
+    card.append(head);
+
+    const meta = [];
+    if (w.duration_minutes != null) meta.push(w.duration_minutes + " min");
+    meta.push(w.working_sets + " working sets");
+    if (w.volume_kg > 0) meta.push(Math.round(w.volume_kg).toLocaleString() + " kg volume");
+    card.append(el("p", "wk-meta", meta.join(" · ")));
+    if (w.description) card.append(el("p", "ex-notes", w.description));
+
+    for (const ex of w.exercises) {
+      const box = el("div", "ex");
+      box.append(el("p", "ex-title", ex.title));
+      if (ex.notes) box.append(el("p", "ex-notes", ex.notes));
+      const list = el("ul", "sets");
+      for (const s of ex.sets) {
+        const li = el("li", "set" + (s.type === "warmup" ? " warmup" : ""));
+        if (s.type !== "normal") li.append(el("span", "tag", s.type === "warmup" ? "W" : s.type));
+        li.append(document.createTextNode(fmtLoad(s)));
+        if (s.weight_kg != null) li.append(el("span", "kg", " (" + trim(Math.round(s.weight_kg * 10) / 10) + " kg)"));
+        li.append(document.createTextNode(" " + fmtEffort(s)));
+        if (s.rpe != null) li.append(el("span", "rpe", "@" + s.rpe));
+        list.append(li);
+      }
+      box.append(list);
+      card.append(box);
+    }
+    return card;
+  }
+
+  function showError(message) {
+    const status = $("status");
+    status.replaceChildren();
+    if (message) status.append(el("div", "error", message));
+  }
+
+  async function loadMore() {
+    if (state.loading) return;
+    state.loading = true;
+    $("more").disabled = true;
+    $("more").textContent = "Loading…";
+    try {
+      const res = await fetch("/hevy/workouts?page=" + (state.page + 1) + "&page_size=10");
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showError(body.detail || "Something went wrong (" + res.status + ").");
+        if (res.status === 400) $("keyform").hidden = false;
+        return;
+      }
+      showError("");
+      $("keyform").hidden = true;
+      state.page = body.page;
+      state.pageCount = body.page_count;
+      for (const w of body.workouts) $("list").append(renderWorkout(w));
+      if (state.page === 1 && body.workouts.length === 0) {
+        $("list").append(el("p", "empty", "No workouts in Hevy yet."));
+      }
+    } catch (err) {
+      showError("Couldn't reach this server. Check your connection.");
+    } finally {
+      state.loading = false;
+      $("more").disabled = false;
+      $("more").textContent = "Load older workouts";
+      $("more").hidden = state.page === 0 || state.page >= state.pageCount;
+    }
+  }
+
+  $("more").addEventListener("click", loadMore);
+
+  $("keysave").addEventListener("click", async () => {
+    const key = $("keyinput").value.trim();
+    if (!key) { showError("Enter your Hevy API key first."); return; }
+    const res = await fetch("/settings/api-key", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ api_key: key }),
+    });
+    if (!res.ok) { showError("Couldn't save the key."); return; }
+    $("keyinput").value = "";
+    $("keyform").hidden = true;
+    showError("");
+    state.page = 0;
+    $("list").replaceChildren();
+    loadMore();
+  });
+
+  loadMore();
+</script>
+</body>
+</html>

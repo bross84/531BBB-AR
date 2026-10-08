@@ -5,7 +5,9 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Any, Literal
 
-from fastapi import FastAPI, HTTPException, Response
+import httpx
+from cryptography.fernet import InvalidToken
+from fastapi import FastAPI, HTTPException, Query, Response
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -17,6 +19,7 @@ from database import get_db, get_rpe_percentage, init_db
 import hevy_client
 import program_parser
 from wave_math import bbb_weight, epley, joker_qualifies, joker_weight, round_weight, session_e1rm, working_weight
+from workout_view import summarize_workout
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +41,81 @@ def health():
 @app.get("/")
 def index():
     return FileResponse("index.html")
+
+
+# ── Recent workouts (read from Hevy) ───────────────────────────────────────────
+
+class SetView(BaseModel):
+    index: int | None = None
+    type: str
+    weight_kg: float | None = None
+    weight_lb: float | None = None
+    reps: int | None = None
+    rpe: float | None = None
+    distance_meters: float | None = None
+    duration_seconds: float | None = None
+
+
+class ExerciseView(BaseModel):
+    title: str
+    notes: str | None = None
+    exercise_template_id: str | None = None
+    sets: list[SetView]
+
+
+class WorkoutView(BaseModel):
+    id: str
+    title: str
+    description: str | None = None
+    start_time: str | None = None
+    end_time: str | None = None
+    duration_minutes: int | None = None
+    working_sets: int
+    volume_kg: float
+    exercises: list[ExerciseView]
+
+
+class WorkoutsPage(BaseModel):
+    page: int
+    page_count: int
+    workouts: list[WorkoutView]
+
+
+@app.get("/recent")
+def recent_page():
+    return FileResponse("recent.html")
+
+
+@app.get("/hevy/workouts", response_model=WorkoutsPage)
+def list_hevy_workouts(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=10),  # Hevy allows at most 10 workouts per page
+):
+    try:
+        data = hevy_client.HevyClient().list_workouts(page=page, page_size=page_size)
+    except InvalidToken:
+        raise HTTPException(
+            status_code=400,
+            detail="The stored Hevy API key can't be decrypted. Save it again.",
+        )
+    except ValueError as exc:  # no key stored, or a corrupt Fernet key file
+        raise HTTPException(status_code=400, detail=str(exc))
+    except httpx.HTTPStatusError as exc:
+        status = exc.response.status_code
+        detail = (
+            "Hevy rejected the API key. Check that it's current and that your account is Hevy Pro."
+            if status in (401, 403)
+            else f"Hevy returned an error ({status})."
+        )
+        raise HTTPException(status_code=502, detail=detail)
+    except httpx.RequestError:
+        raise HTTPException(status_code=502, detail="Couldn't reach Hevy.")
+
+    return {
+        "page": int(data.get("page", page)),
+        "page_count": int(data.get("page_count", 1)),
+        "workouts": [summarize_workout(w) for w in data.get("workouts", [])],
+    }
 
 
 # ── Settings ───────────────────────────────────────────────────────────────────
