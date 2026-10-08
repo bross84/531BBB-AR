@@ -581,19 +581,6 @@ def _slot_in_program(conn, slot_id: int, program_id: int) -> dict[str, Any] | No
     return dict(row) if row is not None else None
 
 
-def _load_api_key(conn) -> str | None:
-    """Read and decrypt the Hevy API key using the existing DB connection."""
-    row = conn.execute(
-        "SELECT value FROM app_settings WHERE key = 'hevy_api_key'"
-    ).fetchone()
-    if row is None:
-        return None
-    try:
-        return hevy_client._decrypt(row["value"])
-    except Exception:
-        return None
-
-
 def _resolve_e1rm(conn, hevy_exercise_id: str) -> float | None:
     """
     Return the most recent e1RM for the given Hevy exercise ID from local e1rm_log.

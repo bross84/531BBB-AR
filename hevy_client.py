@@ -1,12 +1,9 @@
-import logging
 import os
 
 import httpx
 from cryptography.fernet import Fernet
 
 from database import get_db
-
-logger = logging.getLogger(__name__)
 
 _BASE_URL = "https://api.hevyapp.com/v1"
 _SETTINGS_KEY = "hevy_api_key"
@@ -147,41 +144,3 @@ class HevyClient:
         if isinstance(created, list):
             created = created[0] if created else {}
         return created or {}
-
-    def best_e1rm_from_hevy(self, hevy_exercise_id: str) -> float | None:
-        """Page through Hevy workout history and return the highest e1RM for the exercise, or None."""
-        from wave_math import epley, round_weight  # local import avoids circular dep
-        best: float | None = None
-        try:
-            page = 1
-            with httpx.Client(timeout=30) as client:
-                while True:
-                    resp = client.get(
-                        f"{_BASE_URL}/workouts",
-                        headers=self._headers(),
-                        params={"page": page, "pageSize": 10},
-                    )
-                    resp.raise_for_status()
-                    data = resp.json()
-                    for workout in data.get("workouts", []):
-                        for ex in workout.get("exercises", []):
-                            if ex.get("exercise_template_id") != hevy_exercise_id:
-                                continue
-                            for s in ex.get("sets", []):
-                                try:
-                                    w = float(s["weight_kg"])
-                                    r = int(s["reps"])
-                                    if r < 1:
-                                        continue
-                                    e = epley(w, r)
-                                    if best is None or e > best:
-                                        best = e
-                                except (KeyError, TypeError, ValueError):
-                                    continue
-                    if page >= data.get("page_count", 1):
-                        break
-                    page += 1
-        except Exception:
-            logger.exception("Hevy workout history fetch failed for exercise %s", hevy_exercise_id)
-            return None
-        return float(round_weight(best)) if best is not None else None
