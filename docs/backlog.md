@@ -10,7 +10,7 @@ Things we've decided to do later, newest first. One feature at a time: pick the 
 
 - **Mark the set a movement's TM comes from** (the `TS` idea): a button on a set that sets the movement's TM from that set's e1RM, using the TM percentage (default 95%). Today the e1RM and TM are worked out from the last session automatically.
 - **Which set defines "last session's e1RM".** The page currently uses the heaviest working set that has an RPE. That is wrong for a lift where weight drops but RPE climbs (it picked 110 lb x 3 on the press). Settle the rule, or let the user mark the set.
-- **Keep our own record of sets.** Hevy cannot store RPE below 6 or 6.5 (it goes into the exercise notes today). A local log would keep every RPE as a number so history can use it.
+- **Keep our own record of sets.** Hevy cannot store RPE below 6 or 6.5 (it is left blank when posting, with a warning on the page). A local log would keep every RPE as a number so history can use it.
 
 ## Using it away from the PC
 

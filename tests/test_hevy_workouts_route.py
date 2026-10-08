@@ -168,7 +168,7 @@ class TestCreateHevyWorkout(WorkoutsRouteCase):
         w = body["workout"]
         self.assertEqual("BS-Bridge 1.3.3", w["title"])
         sets = w["exercises"][0]["sets"]
-        self.assertEqual([49.9, 120.2, 127.46], [s["weight_kg"] for s in sets])
+        self.assertEqual([50.0, 120.0, 127.5], [s["weight_kg"] for s in sets])
         self.assertEqual("tpl-squat", w["exercises"][0]["exercise_template_id"])
 
     def test_unstorable_rpe_is_dropped_and_reported(self):
@@ -178,10 +178,10 @@ class TestCreateHevyWorkout(WorkoutsRouteCase):
         (body,), _ = self.hevy.create_workout.call_args
         self.assertIsNone(body["workout"]["exercises"][0]["sets"][2]["rpe"])
 
-    def test_unstorable_rpe_reaches_hevy_as_a_note(self):
+    def test_unstorable_rpe_adds_no_note(self):
         self._post()
         (body,), _ = self.hevy.create_workout.call_args
-        self.assertEqual("RPE Hevy can't store: set 2 @5", body["workout"]["exercises"][0]["notes"])
+        self.assertNotIn("notes", body["workout"]["exercises"][0])
 
     def test_rpe_outside_0_to_10_is_422(self):
         entry = {**ENTRY, "exercises": [{"exercise_template_id": "t", "sets": [{"reps": 5, "rpe": 11}]}]}

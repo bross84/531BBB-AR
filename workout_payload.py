@@ -4,11 +4,12 @@ No DB access, no HTTP calls, no side effects.
 
 Hevy's rules (docs/hevy-api.md): snake_case keys wrapped in {"workout": {...}}; set type is one of
 warmup / normal / failure / dropset; rpe is one of 6, 7, 7.5, 8, 8.5, 9, 9.5, 10 or null.
-An RPE Hevy cannot store (below 6, or 6.5) is left out of the RPE field and written into the exercise's
-notes instead, so the information is not lost.
+An RPE Hevy cannot store (below 6, or 6.5) is left blank, and the caller is warned.
+Weights are typed in lb but loaded in kg, so they are posted as the nearest half kilo (198 lb -> 90 kg).
 """
 from __future__ import annotations
 
+import math
 from datetime import datetime
 from typing import Any
 
@@ -19,6 +20,11 @@ HEVY_RPE_VALUES = (6.0, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0)
 
 def lb_to_kg(lb: float) -> float:
     return round(lb * LB_TO_KG, 2)
+
+
+def lb_to_plate_kg(lb: float) -> float:
+    """The kg actually on the bar for a weight typed in lb: the nearest half kilo."""
+    return math.floor(lb * LB_TO_KG * 2 + 0.5) / 2
 
 
 def _parse_time(value: str) -> datetime:
@@ -60,7 +66,6 @@ def build_hevy_workout(entry: dict[str, Any]) -> tuple[dict[str, Any], list[str]
             raise ValueError(f"{name} has no Hevy exercise id.")
 
         sets = []
-        unstorable: list[str] = []
         working = 0
         for number, raw_set in enumerate(raw_exercise.get("sets") or [], start=1):
             set_type = raw_set.get("type") or "normal"
@@ -80,18 +85,16 @@ def build_hevy_workout(entry: dict[str, Any]) -> tuple[dict[str, Any], list[str]
             if rpe is not None and not 0 <= float(rpe) <= 10:
                 raise ValueError(f"{name} set {number}: RPE must be between 0 and 10.")
             if rpe is not None and float(rpe) not in HEVY_RPE_VALUES:
-                label = _set_label(set_type, working)
-                unstorable.append(f"{label} @{float(rpe):g}")
                 warnings.append(
-                    f"{name} {label}: RPE {float(rpe):g} can't be stored in Hevy's RPE field, "
-                    "so it was written into the exercise notes."
+                    f"{name} {_set_label(set_type, working)}: RPE {float(rpe):g} can't be stored in Hevy, "
+                    "so it was left blank."
                 )
                 rpe = None
 
             sets.append(
                 {
                     "type": set_type,
-                    "weight_kg": lb_to_kg(weight_lb) if weight_lb is not None else None,
+                    "weight_kg": lb_to_plate_kg(weight_lb) if weight_lb is not None else None,
                     "reps": reps,
                     "rpe": float(rpe) if rpe is not None else None,
                 }
@@ -101,9 +104,6 @@ def build_hevy_workout(entry: dict[str, Any]) -> tuple[dict[str, Any], list[str]
 
         exercise: dict[str, Any] = {"exercise_template_id": template_id, "sets": sets}
         notes = (raw_exercise.get("notes") or "").strip()
-        if unstorable:
-            line = "RPE Hevy can't store: " + ", ".join(unstorable)
-            notes = notes + "\n" + line if notes else line
         if notes:
             exercise["notes"] = notes
         exercises.append(exercise)
