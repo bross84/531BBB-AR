@@ -48,17 +48,18 @@
     .set .tick { padding: 0; font-size: 20px; }
     .set.done .tick { background: var(--done-line); color: #fff; border-color: transparent; }
     .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    .refbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 10px; }
-    .check { display: flex; gap: 8px; align-items: center; min-height: 44px; font-size: 15px; }
-    .check input { min-height: 0; width: 22px; height: 22px; }
-    .seg { display: flex; }
-    .seg button { border-radius: 0; min-height: 40px; padding: 6px 14px; }
-    .seg button:first-child { border-radius: 10px 0 0 10px; }
-    .seg button:last-child { border-radius: 0 10px 10px 0; border-left: none; }
-    .seg button[aria-pressed=true] { background: var(--accent); color: #fff; border-color: transparent; }
-    .refbar .pctval { width: 64px; text-align: center; min-height: 40px; padding: 4px 6px; }
-    .refline { margin: 4px 0 0; font-size: 15px; }
-    .hint { font-size: 12px; color: var(--muted); }
+    .refbar { margin: 0 0 10px; }
+    .tiles { display: flex; gap: 8px; align-items: stretch; }
+    .tile { flex: 1; min-width: 0; background: var(--chip); border: 1.5px solid transparent; border-radius: 12px; padding: 6px 10px; cursor: pointer; display: flex; flex-direction: column; }
+    .tile .tl { font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 2px; white-space: nowrap; }
+    .tile .tv { font-size: 22px; font-weight: 500; line-height: 1.2; font-variant-numeric: tabular-nums; }
+    .tile.on { border-color: var(--accent); background: transparent; }
+    .tile.on .tv { color: var(--accent); }
+    .tile .pctin { width: 34px; min-height: 0; height: 20px; padding: 0 2px; font-size: 11px; text-align: center; border-radius: 6px; background: var(--bg); }
+    .pill { align-self: center; padding: 8px 12px; min-height: 40px; border-radius: 20px; font-size: 13px; color: var(--muted); }
+    .pill.on { color: var(--accent); border-color: var(--accent); }
+    .set select.actual { border-color: var(--accent); color: var(--accent); }
+    .hint { font-size: 12px; color: var(--muted); margin: 6px 0 0; }
     .msg { border-radius: 10px; padding: 10px 12px; margin: 0 0 12px; font-size: 15px; }
     .msg.error { background: var(--danger-bg); color: var(--danger); }
     .msg.ok { background: var(--ok-bg); color: var(--ok); }
@@ -88,6 +89,7 @@
     <div class="card">
       <input id="title" type="text" aria-label="Workout title" autocomplete="off" />
       <p id="clock" class="muted" style="margin:6px 0 0"></p>
+      <p class="hint">Before ✓ the RPE plans the weight. Tap ✓ right after the set: the RPE you set then is the one you logged, and the weight stays.</p>
     </div>
     <div id="exercises"></div>
     <button id="addEx" class="wide" type="button">Add exercise</button>
@@ -175,7 +177,7 @@
     for (let j = index - 1; j >= 0; j--) {
       const p = ex.sets[j];
       if (!p.done || p.type === "warmup") continue;
-      const lb = parseFloat(p.lb), reps = parseInt(p.reps, 10), rpe = parseFloat(p.rpe);
+      const lb = parseFloat(p.lb), reps = parseInt(p.reps, 10), rpe = parseFloat(p.arpe || p.rpe);
       if (!(lb > 0) || !(reps > 0) || isNaN(rpe)) continue;
       const pct = pctFor(rpe, reps);
       if (pct) return lb / pct;
@@ -332,43 +334,55 @@
 
   function renderRefBar(ex) {
     const wrap = el("div", "refbar");
-    const row = el("div", "row");
+    const st = ex.ref.state, found = !!(st && st.found);
+    const show = (v) => (!st ? "…" : v == null ? "–" : String(v));
 
-    const seg = el("div", "seg");
-    for (const [key, text] of [["e1rm", "e1RM"], ["tm", "TM"]]) {
-      const b = el("button", null, text); b.type = "button"; b.setAttribute("aria-pressed", String(ex.ref.basis === key));
-      b.addEventListener("click", () => { ex.ref.basis = key; applyAuto(ex); saveDraft(); saveRef(ex); refreshCard(ex); });
-      seg.append(b);
-    }
-    const label = el("label", "check");
-    label.title = "Plan each set from the e1RM of the last set you ticked. Off: every set uses the e1RM or TM above.";
-    const box = el("input"); box.type = "checkbox"; box.checked = ex.ref.ls;
-    label.append(box, document.createTextNode("LSe1RM"));
-    box.addEventListener("change", () => { ex.ref.ls = box.checked; applyAuto(ex); saveDraft(); saveRef(ex); refreshCard(ex); });
-    row.append(seg, label);
+    const tiles = el("div", "tiles");
+    const tile = (key, label, value) => {
+      const t = el("div", "tile" + (ex.ref.basis === key ? " on" : ""));
+      t.setAttribute("role", "radio"); t.setAttribute("aria-checked", String(ex.ref.basis === key)); t.tabIndex = 0;
+      t.append(label, el("span", "tv", value));
+      const choose = () => {
+        if (ex.ref.basis === key) return;
+        ex.ref.basis = key; applyAuto(ex); saveDraft(); saveRef(ex); refreshCard(ex);
+      };
+      t.addEventListener("click", choose);
+      t.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); choose(); } });
+      return t;
+    };
 
-    if (ex.ref.basis === "tm") {
-      const pct = el("input", "pctval"); pct.type = "text"; pct.inputMode = "decimal";
-      pct.value = trim(ex.ref.tmPct * 100); pct.setAttribute("aria-label", "TM as a percentage of e1RM");
-      pct.addEventListener("input", () => {
-        const v = Number(pct.value) / 100;
-        if (v >= 0.5 && v <= 1) { ex.ref.tmPct = v; applyAuto(ex); saveDraft(); saveRef(ex); }
-      });
-      pct.addEventListener("change", () => refreshCard(ex));
-      row.append(pct, el("span", "hint", "% of e1RM"));
-    }
-    wrap.append(row);
+    tiles.append(tile("e1rm", el("span", "tl", "e1RM"), show(found ? Math.round(st.e1rm_lb) : null)));
 
-    const st = ex.ref.state;
-    let line;
-    if (!st) line = "Working out your e1RM from your last session…";
-    else if (!st.found) line = "No RPE history for this movement yet." + (st.error ? " (" + st.error + ")" : "");
-    else line = "e1RM " + Math.round(st.e1rm_lb) + " · TM " + Math.round(st.e1rm_lb * ex.ref.tmPct) + " (" + trim(ex.ref.tmPct * 100) + "%)";
-    wrap.append(el("p", "refline", line));
-    if (st && st.found) {
+    const tmLabel = el("span", "tl");
+    tmLabel.append("TM ");
+    const pct = el("input", "pctin"); pct.type = "text"; pct.inputMode = "decimal";
+    pct.value = trim(ex.ref.tmPct * 100); pct.setAttribute("aria-label", "TM as a percentage of e1RM");
+    pct.addEventListener("click", (e) => e.stopPropagation());
+    tmLabel.append(pct, "%");
+    const tmTile = tile("tm", tmLabel, show(found ? Math.round(st.e1rm_lb * ex.ref.tmPct) : null));
+    pct.addEventListener("input", () => {
+      const v = Number(pct.value) / 100;
+      if (!(v >= 0.5 && v <= 1)) return;
+      ex.ref.tmPct = v; applyAuto(ex); saveDraft(); saveRef(ex);
+      if (found) tmTile.querySelector(".tv").textContent = String(Math.round(st.e1rm_lb * v));
+    });
+    tiles.append(tmTile);
+
+    const ls = el("button", "pill" + (ex.ref.ls ? " on" : ""), "LSe1RM");
+    ls.type = "button"; ls.setAttribute("aria-pressed", String(ex.ref.ls));
+    ls.title = "Plan each set from the e1RM of the last set you ticked. Off: every set uses the e1RM or TM selected here.";
+    ls.addEventListener("click", () => { ex.ref.ls = !ex.ref.ls; applyAuto(ex); saveDraft(); saveRef(ex); refreshCard(ex); });
+    tiles.append(ls);
+    wrap.append(tiles);
+
+    let note;
+    if (!st) note = "Working out your e1RM from your last session…";
+    else if (!found) note = "No RPE history for this movement yet." + (st.error ? " (" + st.error + ")" : "");
+    else {
       const rpe = st.set_rpe != null ? " @" + st.set_rpe : "";
-      wrap.append(el("p", "hint", "from " + (st.workout_title || "last session") + ", " + fmtShortDate(st.workout_start_time) + ": " + Math.round(st.set_weight_lb) + " lb × " + st.set_reps + rpe));
+      note = "From " + (st.workout_title || "last session") + ", " + fmtShortDate(st.workout_start_time) + ": " + Math.round(st.set_weight_lb) + " lb × " + st.set_reps + rpe;
     }
+    wrap.append(el("p", "hint", note));
     return wrap;
   }
 
@@ -393,20 +407,33 @@
       lbInputs.set(s, lb);
       lb.addEventListener("input", () => {
         s.lb = lb.value; s.manual = lb.value.trim() !== "";
-        if (!s.manual) applyAuto(ex, s);   // clearing the box hands the weight back to auto
+        if (s.done) applyAuto(ex);                // a logged set changed: re-plan the sets after it
+        else if (!s.manual) applyAuto(ex, s);     // clearing the box hands the weight back to auto
         saveDraft();
       });
       const reps = el("input"); reps.type = "text"; reps.inputMode = "numeric"; reps.value = s.reps; reps.setAttribute("aria-label", "Reps");
-      reps.addEventListener("input", () => { s.reps = reps.value; applyAuto(ex, s); saveDraft(); });
+      reps.addEventListener("input", () => { s.reps = reps.value; applyAuto(ex, s.done ? null : s); saveDraft(); });
 
       const rpe = el("select"); rpe.setAttribute("aria-label", "RPE");
       for (const v of [""].concat(RPES)) { const o = el("option", null, v === "" ? "–" : String(v)); o.value = String(v); rpe.append(o); }
-      rpe.value = s.rpe;
-      rpe.addEventListener("change", () => { s.rpe = rpe.value; applyAuto(ex, s); saveDraft(); });
+      rpe.value = s.done ? (s.arpe || s.rpe) : s.rpe;
+      if (s.done) rpe.classList.add("actual");
+      rpe.addEventListener("change", () => {
+        if (s.done) { s.arpe = rpe.value; applyAuto(ex); }   // the RPE you logged: the weight stays
+        else { s.rpe = rpe.value; applyAuto(ex, s); }        // the plan: the weight follows it
+        saveDraft();
+      });
 
       const tick = el("button", "tick", "✓");
       tick.type = "button"; tick.setAttribute("aria-label", "Mark set done");
-      tick.addEventListener("click", () => { s.done = !s.done; row.classList.toggle("done", s.done); applyAuto(ex); saveDraft(); });
+      tick.addEventListener("click", () => {
+        s.done = !s.done;
+        if (s.done && !s.arpe) s.arpe = s.rpe;   // from here the RPE box is the RPE you logged
+        row.classList.toggle("done", s.done);
+        rpe.value = s.done ? (s.arpe || s.rpe) : s.rpe;
+        rpe.classList.toggle("actual", s.done);
+        applyAuto(ex); saveDraft();
+      });
 
       row.append(kind, lb, reps, rpe, tick);
       card.append(row);
@@ -504,7 +531,8 @@
         if (!Number.isInteger(reps) || reps < 0) throw new Error(where + ": enter the reps you did.");
         const lb = s.lb.trim() === "" ? null : Number(s.lb);
         if (lb !== null && (isNaN(lb) || lb < 0)) throw new Error(where + ": the weight isn't a number.");
-        sets.push({ type: s.type, weight_lb: lb, reps, rpe: s.rpe === "" ? null : Number(s.rpe) });
+        const logged = s.arpe || s.rpe;
+        sets.push({ type: s.type, weight_lb: lb, reps, rpe: !logged ? null : Number(logged) });
       }
       if (sets.length) exercises.push({ exercise_template_id: ex.template_id, title: ex.title, notes: ex.notes, sets });
     }
