@@ -134,6 +134,8 @@ def init_db() -> None:
                 tm_lb REAL,
                 basis TEXT NOT NULL DEFAULT 'e1rm' CHECK(basis IN ('e1rm','tm')),
                 auto INTEGER NOT NULL DEFAULT 0,
+                ls INTEGER NOT NULL DEFAULT 1,
+                tm_pct REAL NOT NULL DEFAULT 0.95,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
             );
         """)
@@ -142,6 +144,15 @@ def init_db() -> None:
             conn.execute("ALTER TABLE exercise_slots ADD COLUMN source_params TEXT")
         except Exception:
             pass  # column already exists
+
+        for ddl in (
+            "ALTER TABLE exercise_refs ADD COLUMN ls INTEGER NOT NULL DEFAULT 1",
+            "ALTER TABLE exercise_refs ADD COLUMN tm_pct REAL NOT NULL DEFAULT 0.95",
+        ):
+            try:
+                conn.execute(ddl)
+            except Exception:
+                pass  # column already exists
 
         try:
             conn.execute(

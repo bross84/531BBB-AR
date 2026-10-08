@@ -17,6 +17,7 @@ load_dotenv()
 
 from database import get_db, get_rpe_percentage, init_db
 import hevy_client
+import exercise_state
 import program_parser
 import refs_store
 from wave_math import bbb_weight, epley, joker_qualifies, joker_weight, round_weight, session_e1rm, working_weight
@@ -169,14 +170,23 @@ class RpeTable(BaseModel):
 
 
 class ExerciseRefInput(BaseModel):
-    e1rm_lb: float | None = Field(default=None, gt=0)
-    tm_lb: float | None = Field(default=None, gt=0)
     basis: Literal["e1rm", "tm"] = "e1rm"
-    auto: bool = False
+    ls: bool = True  # plan the next set from the last set's e1RM (LSe1RM)
+    tm_pct: float = Field(default=refs_store.DEFAULT_TM_PCT, ge=0.5, le=1.0)
 
 
 class ExerciseRef(ExerciseRefInput):
     exercise_template_id: str
+
+
+class ExerciseState(BaseModel):
+    found: bool
+    workout_title: str | None = None
+    workout_start_time: str | None = None
+    set_weight_lb: float | None = None
+    set_reps: int | None = None
+    set_rpe: float | None = None
+    e1rm_lb: float | None = None
 
 
 @app.get("/log")
@@ -199,7 +209,14 @@ def list_exercise_refs():
 
 @app.put("/exercise-refs/{exercise_template_id}", response_model=ExerciseRef)
 def put_exercise_ref(exercise_template_id: str, data: ExerciseRefInput):
-    return refs_store.save_ref(exercise_template_id, data.e1rm_lb, data.tm_lb, data.basis, data.auto)
+    return refs_store.save_ref(exercise_template_id, data.basis, data.ls, data.tm_pct)
+
+
+@app.get("/hevy/exercise-state/{exercise_template_id}", response_model=ExerciseState)
+def get_exercise_state(exercise_template_id: str):
+    """A movement's current e1RM, worked out from its last session in Hevy with the user's RPE table."""
+    entries = _call_hevy(lambda client: client.exercise_history(exercise_template_id))
+    return exercise_state.build_exercise_state(entries, get_rpe_percentage)
 
 
 @app.post("/hevy/workouts", response_model=SavedWorkout)
