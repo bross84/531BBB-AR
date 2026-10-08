@@ -41,12 +41,12 @@
     .last { font-size: 13px; color: var(--muted); margin: 0 0 8px; }
     .cols, .set { display: grid; grid-template-columns: 38px 1fr 1fr 66px 42px; gap: 4px; align-items: center; }
     .cols { font-size: 11px; color: var(--muted); text-align: center; margin: 0 0 2px; }
-    .set { margin: 0 0 6px; padding: 2px; border-radius: 10px; border: 1px solid transparent; }
+    .set { margin: 0 0 4px; padding: 2px 2px 15px; border-radius: 10px; border: 1px solid transparent; }
     .set.done { background: var(--done); border-color: var(--done-line); }
     .set input, .set select { width: 100%; text-align: center; padding: 6px 2px; }
     .set .kind { padding: 0; font-size: 14px; color: var(--muted); }
-    .wcell { display: flex; flex-direction: column; align-items: center; min-width: 0; }
-    .wcell .kg { font-size: 11px; color: var(--muted); line-height: 1.1; margin-top: 2px; min-height: 12px; }
+    .wcell { position: relative; min-width: 0; }
+    .wcell .kg { position: absolute; left: 0; right: 0; top: 100%; margin-top: 1px; text-align: center; font-size: 11px; line-height: 1; color: var(--muted); pointer-events: none; }
     .set .tick { padding: 0; font-size: 20px; }
     .set.done .tick { background: var(--done-line); color: #fff; border-color: transparent; }
     .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
