@@ -127,6 +127,15 @@ def init_db() -> None:
                 percentage REAL NOT NULL,
                 PRIMARY KEY (rpe, reps)
             );
+
+            CREATE TABLE IF NOT EXISTS exercise_refs (
+                exercise_template_id TEXT PRIMARY KEY,
+                e1rm_lb REAL,
+                tm_lb REAL,
+                basis TEXT NOT NULL DEFAULT 'e1rm' CHECK(basis IN ('e1rm','tm')),
+                auto INTEGER NOT NULL DEFAULT 0,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
         """)
 
         try:

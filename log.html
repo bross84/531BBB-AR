@@ -48,6 +48,16 @@
     .set .tick { padding: 0; font-size: 20px; }
     .set.done .tick { background: var(--done-line); color: #fff; border-color: transparent; }
     .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .refbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 10px; }
+    .check { display: flex; gap: 8px; align-items: center; min-height: 44px; font-size: 15px; }
+    .check input { min-height: 0; width: 22px; height: 22px; }
+    .seg { display: flex; }
+    .seg button { border-radius: 0; min-height: 40px; padding: 6px 14px; }
+    .seg button:first-child { border-radius: 10px 0 0 10px; }
+    .seg button:last-child { border-radius: 0 10px 10px 0; border-left: none; }
+    .seg button[aria-pressed=true] { background: var(--accent); color: #fff; border-color: transparent; }
+    .refbar .refval { width: 100px; text-align: center; min-height: 40px; padding: 4px 6px; }
+    .hint { font-size: 12px; color: var(--muted); }
     .msg { border-radius: 10px; padding: 10px 12px; margin: 0 0 12px; font-size: 15px; }
     .msg.error { background: var(--danger-bg); color: var(--danger); }
     .msg.ok { background: var(--ok-bg); color: var(--ok); }
@@ -110,6 +120,9 @@
   const KEY = "logDraft";
   const $ = (id) => document.getElementById(id);
   let draft = null, recentPage = null, catalog = null, saving = false;
+  const LB_PER_KG = 2.20462;
+  let rpeTable = new Map(), refs = {};
+  const lbInputs = new WeakMap(), refTimers = {};
 
   function el(tag, cls, text) { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
   function uid() { return (crypto.randomUUID && crypto.randomUUID()) || String(Date.now()) + Math.random(); }
@@ -141,6 +154,71 @@
       throw err;
     }
     return body;
+  }
+
+  // ── Auto weight: reference number x RPE table percentage ────────────────────
+  function pctFor(rpe, reps) { return rpeTable.get(rpe + "|" + reps); }
+  // Round to the nearest 2.5 kg plate step, then show whole pounds (120 kg -> 265 lb).
+  function plateLb(rawLb) { return Math.round(Math.round(rawLb / LB_PER_KG / 2.5) * 2.5 * LB_PER_KG); }
+  function defaultRef() { return { auto: false, basis: "e1rm", e1rm: "", tm: "", seeded: false }; }
+  function refFromServer(id) {
+    const r = refs[id];
+    if (!r) return defaultRef();
+    return { auto: r.auto, basis: r.basis, e1rm: r.e1rm_lb != null ? String(r.e1rm_lb) : "", tm: r.tm_lb != null ? String(r.tm_lb) : "", seeded: false };
+  }
+  function refValue(ex) { const v = Number(ex.ref.basis === "tm" ? ex.ref.tm : ex.ref.e1rm); return v > 0 ? v : null; }
+
+  function autoWeight(ex, s) {
+    if (!ex.ref.auto) return null;
+    const base = refValue(ex), reps = parseInt(s.reps, 10), rpe = parseFloat(s.rpe);
+    if (!base || !(reps > 0) || isNaN(rpe)) return null;
+    const pct = pctFor(rpe, reps);
+    return pct ? plateLb(base * pct) : null;
+  }
+
+  // Fill weights from RPE. Never touches a set that is ticked done or whose weight was typed by hand.
+  function applyAuto(ex, only) {
+    for (const s of only ? [only] : ex.sets) {
+      if (s.done || s.manual) continue;
+      const w = autoWeight(ex, s);
+      if (w == null) continue;
+      s.lb = String(w);
+      const input = lbInputs.get(s);
+      if (input) input.value = s.lb;
+    }
+  }
+
+  function saveRef(ex) {
+    const id = ex.template_id;
+    clearTimeout(refTimers[id]);
+    refTimers[id] = setTimeout(async () => {
+      const num = (v) => { const n = Number(v); return n > 0 ? n : null; };
+      const body = { e1rm_lb: num(ex.ref.e1rm), tm_lb: num(ex.ref.tm), basis: ex.ref.basis, auto: ex.ref.auto };
+      try {
+        refs[id] = await api("/exercise-refs/" + encodeURIComponent(id), {
+          method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+        });
+      } catch (err) { /* the draft still holds it; it is saved again on the next change */ }
+    }, 600);
+  }
+
+  // A starting e1RM from a copied workout: the e1RM of its last working set that has reps and an RPE.
+  function seedE1rm(sets) {
+    let value = null;
+    for (const s of sets) {
+      if (s.type === "warmup" || s.weight_lb == null || !s.reps || s.rpe == null) continue;
+      const pct = pctFor(s.rpe, s.reps);
+      if (pct) value = Math.round(s.weight_lb / pct);
+    }
+    return value;
+  }
+
+  async function loadReference() {
+    try {
+      const [table, list] = await Promise.all([api("/rpe-table"), api("/exercise-refs")]);
+      rpeTable = new Map(table.rows.map((r) => [r[0] + "|" + r[1], r[2]]));
+      refs = Object.fromEntries(list.map((r) => [r.exercise_template_id, r]));
+    } catch (err) { /* auto weight simply stays unavailable */ }
   }
 
   // ── Start screen ────────────────────────────────────────────────────────────
@@ -180,20 +258,29 @@
     draft = {
       title: w.title,
       startedAt: new Date().toISOString(),
-      exercises: w.exercises.map((ex) => ({
-        id: uid(),
-        template_id: ex.exercise_template_id,
-        title: ex.title,
-        notes: "",
-        last: lastSummary(ex.sets),
-        sets: ex.sets.map((s) => ({
-          type: s.type || "normal",
-          lb: s.weight_lb != null ? trim(Math.round(s.weight_lb * 2) / 2) : "",
-          reps: s.reps != null ? String(s.reps) : "",
-          rpe: RPES.includes(s.rpe) ? String(s.rpe) : "",
-          done: false,
-        })),
-      })).filter((ex) => ex.template_id),
+      exercises: w.exercises.map((ex) => {
+        const ref = refFromServer(ex.exercise_template_id);
+        if (!ref.e1rm) {
+          const seed = seedE1rm(ex.sets);
+          if (seed) { ref.e1rm = String(seed); ref.seeded = true; }
+        }
+        return {
+          id: uid(),
+          template_id: ex.exercise_template_id,
+          title: ex.title,
+          notes: "",
+          last: lastSummary(ex.sets),
+          ref,
+          sets: ex.sets.map((s) => ({
+            type: s.type || "normal",
+            lb: s.weight_lb != null ? trim(Math.round(s.weight_lb * 2) / 2) : "",
+            reps: s.reps != null ? String(s.reps) : "",
+            rpe: RPES.includes(s.rpe) ? String(s.rpe) : "",
+            done: false,
+            manual: false,
+          })),
+        };
+      }).filter((ex) => ex.template_id),
     };
     saveDraft(); say(""); renderWorkout();
   }
@@ -212,10 +299,40 @@
     tickClock();
   }
 
+  function renderRefBar(ex) {
+    const bar = el("div", "refbar");
+    const label = el("label", "check");
+    const box = el("input"); box.type = "checkbox"; box.checked = ex.ref.auto;
+    label.append(box, document.createTextNode("Auto weight"));
+    box.addEventListener("change", () => {
+      ex.ref.auto = box.checked;
+      if (ex.ref.auto) applyAuto(ex);
+      saveDraft(); saveRef(ex); renderWorkout();
+    });
+    bar.append(label);
+    if (ex.ref.auto) {
+      const seg = el("div", "seg");
+      for (const [key, text] of [["e1rm", "e1RM"], ["tm", "TM"]]) {
+        const b = el("button", null, text); b.type = "button"; b.setAttribute("aria-pressed", String(ex.ref.basis === key));
+        b.addEventListener("click", () => { ex.ref.basis = key; applyAuto(ex); saveDraft(); saveRef(ex); renderWorkout(); });
+        seg.append(b);
+      }
+      const val = el("input", "refval"); val.type = "text"; val.inputMode = "decimal";
+      const isTm = ex.ref.basis === "tm";
+      val.placeholder = isTm ? "TM lb" : "e1RM lb"; val.value = isTm ? ex.ref.tm : ex.ref.e1rm;
+      val.setAttribute("aria-label", isTm ? "Training max in pounds" : "e1RM in pounds");
+      val.addEventListener("input", () => { ex.ref[ex.ref.basis] = val.value; ex.ref.seeded = false; applyAuto(ex); saveDraft(); saveRef(ex); });
+      bar.append(seg, val);
+      if (ex.ref.seeded && !isTm) bar.append(el("span", "hint", "from last workout"));
+    }
+    return bar;
+  }
+
   function renderExercise(ex) {
     const card = el("section", "card");
     card.append(el("p", "ex-title", ex.title));
     if (ex.last) card.append(el("p", "last", ex.last));
+    card.append(renderRefBar(ex));
     const cols = el("div", "cols");
     for (const t of ["", "lb", "reps", "RPE", ""]) cols.append(el("span", null, t));
     card.append(cols);
@@ -229,14 +346,19 @@
       kind.addEventListener("click", () => { s.type = NEXT_KIND[s.type]; saveDraft(); renderWorkout(); });
 
       const lb = el("input"); lb.type = "text"; lb.inputMode = "decimal"; lb.value = s.lb; lb.setAttribute("aria-label", "Weight in pounds");
-      lb.addEventListener("input", () => { s.lb = lb.value; saveDraft(); });
+      lbInputs.set(s, lb);
+      lb.addEventListener("input", () => {
+        s.lb = lb.value; s.manual = lb.value.trim() !== "";
+        if (!s.manual) applyAuto(ex, s);   // clearing the box hands the weight back to auto
+        saveDraft();
+      });
       const reps = el("input"); reps.type = "text"; reps.inputMode = "numeric"; reps.value = s.reps; reps.setAttribute("aria-label", "Reps");
-      reps.addEventListener("input", () => { s.reps = reps.value; saveDraft(); });
+      reps.addEventListener("input", () => { s.reps = reps.value; applyAuto(ex, s); saveDraft(); });
 
       const rpe = el("select"); rpe.setAttribute("aria-label", "RPE");
       for (const v of [""].concat(RPES)) { const o = el("option", null, v === "" ? "–" : String(v)); o.value = String(v); rpe.append(o); }
       rpe.value = s.rpe;
-      rpe.addEventListener("change", () => { s.rpe = rpe.value; saveDraft(); });
+      rpe.addEventListener("change", () => { s.rpe = rpe.value; applyAuto(ex, s); saveDraft(); });
 
       const tick = el("button", "tick", "✓");
       tick.type = "button"; tick.setAttribute("aria-label", "Mark set done");
@@ -250,7 +372,9 @@
     const add = el("button", null, "Add set"); add.type = "button";
     add.addEventListener("click", () => {
       const prev = ex.sets[ex.sets.length - 1];
-      ex.sets.push({ type: "normal", lb: prev ? prev.lb : "", reps: prev ? prev.reps : "", rpe: prev ? prev.rpe : "", done: false });
+      const next = { type: "normal", lb: prev ? prev.lb : "", reps: prev ? prev.reps : "", rpe: prev ? prev.rpe : "", done: false, manual: false };
+      ex.sets.push(next);
+      applyAuto(ex, next);
       saveDraft(); renderWorkout();
     });
     const del = el("button", "link", "Remove last set"); del.type = "button";
@@ -309,8 +433,8 @@
       const b = el("button", "pick"); b.type = "button";
       b.append(el("span", null, e.title), el("small", null, e.primary_muscle || ""));
       b.addEventListener("click", () => {
-        draft.exercises.push({ id: uid(), template_id: e.id, title: e.title, notes: "", last: null,
-          sets: [{ type: "normal", lb: "", reps: "", rpe: "", done: false }] });
+        draft.exercises.push({ id: uid(), template_id: e.id, title: e.title, notes: "", last: null, ref: refFromServer(e.id),
+          sets: [{ type: "normal", lb: "", reps: "", rpe: "", done: false, manual: false }] });
         saveDraft(); $("picker").hidden = true; renderWorkout();
       });
       box.append(b);
@@ -362,8 +486,16 @@
   });
 
   // ── Boot ────────────────────────────────────────────────────────────────────
-  draft = loadDraft();
-  if (draft && Array.isArray(draft.exercises)) { renderWorkout(); } else { draft = null; renderStart(); }
+  loadReference().then(() => {
+    draft = loadDraft();
+    if (draft && Array.isArray(draft.exercises)) {
+      for (const ex of draft.exercises) {
+        ex.ref = ex.ref || refFromServer(ex.template_id);
+        for (const s of ex.sets) if (s.manual === undefined) s.manual = false;
+      }
+      renderWorkout();
+    } else { draft = null; renderStart(); }
+  });
 </script>
 </body>
 </html>

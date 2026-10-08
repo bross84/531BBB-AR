@@ -18,6 +18,7 @@ load_dotenv()
 from database import get_db, get_rpe_percentage, init_db
 import hevy_client
 import program_parser
+import refs_store
 from wave_math import bbb_weight, epley, joker_qualifies, joker_weight, round_weight, session_e1rm, working_weight
 from workout_payload import build_hevy_workout
 from workout_view import summarize_workout
@@ -163,9 +164,42 @@ class SavedWorkout(BaseModel):
     warnings: list[str]
 
 
+class RpeTable(BaseModel):
+    rows: list[list[float]]  # [rpe, reps, fraction of e1RM], e.g. [8.0, 5, 0.826]
+
+
+class ExerciseRefInput(BaseModel):
+    e1rm_lb: float | None = Field(default=None, gt=0)
+    tm_lb: float | None = Field(default=None, gt=0)
+    basis: Literal["e1rm", "tm"] = "e1rm"
+    auto: bool = False
+
+
+class ExerciseRef(ExerciseRefInput):
+    exercise_template_id: str
+
+
 @app.get("/log")
 def log_page():
     return FileResponse("log.html")
+
+
+@app.get("/rpe-table", response_model=RpeTable)
+def get_rpe_table():
+    """The RPE table in use, so the log page can turn an RPE and reps into a percentage of e1RM."""
+    with get_db() as conn:
+        rows = conn.execute("SELECT rpe, reps, percentage FROM rpe_chart ORDER BY rpe DESC, reps").fetchall()
+    return {"rows": [[r["rpe"], r["reps"], r["percentage"]] for r in rows]}
+
+
+@app.get("/exercise-refs", response_model=list[ExerciseRef])
+def list_exercise_refs():
+    return refs_store.list_refs()
+
+
+@app.put("/exercise-refs/{exercise_template_id}", response_model=ExerciseRef)
+def put_exercise_ref(exercise_template_id: str, data: ExerciseRefInput):
+    return refs_store.save_ref(exercise_template_id, data.e1rm_lb, data.tm_lb, data.basis, data.auto)
 
 
 @app.post("/hevy/workouts", response_model=SavedWorkout)
