@@ -24,6 +24,8 @@ warnings.filterwarnings("ignore", category=ResourceWarning)
 # DB_PATH must exist before main is imported (load_dotenv does not override env vars).
 _IMPORT_DIR = tempfile.mkdtemp()
 os.environ["DB_PATH"] = os.path.join(_IMPORT_DIR, "import.db")
+# These tests pin planned weights computed from the BUILT-IN whole-percent RPE table, not the user's own.
+os.environ["RPE_CHART_PATH"] = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "rpe_chart.csv")
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from fastapi.testclient import TestClient  # noqa: E402

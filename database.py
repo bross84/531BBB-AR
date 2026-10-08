@@ -1,4 +1,6 @@
 import csv
+import hashlib
+import io
 import os
 import sqlite3
 
@@ -142,19 +144,41 @@ def init_db() -> None:
         _seed_rpe_chart(conn)
 
 
-_RPE_CSV = os.path.join(os.path.dirname(__file__), "data", "rpe_chart.csv")
+_DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+_BUILTIN_RPE_CSV = os.path.join(_DATA_DIR, "rpe_chart.csv")
+_USER_RPE_CSV = os.path.join(_DATA_DIR, "rpe_chart_user.csv")
+_RPE_SOURCE_KEY = "rpe_chart_source"
+
+
+def _rpe_csv_path() -> str:
+    """The user's own table wins. RPE_CHART_PATH overrides it (used by tests); the built-in table is the fallback."""
+    override = os.environ.get("RPE_CHART_PATH")
+    if override:
+        return override
+    return _USER_RPE_CSV if os.path.exists(_USER_RPE_CSV) else _BUILTIN_RPE_CSV
 
 
 def _seed_rpe_chart(conn: sqlite3.Connection) -> None:
-    row = conn.execute("SELECT COUNT(*) FROM rpe_chart").fetchone()
-    if row[0] > 0:
+    """Make the rpe_chart table match the chosen CSV, replacing it when the file changes.
+    A hash of the file is kept in app_settings so an unchanged file is not reloaded on every start."""
+    with open(_rpe_csv_path(), "rb") as f:
+        raw = f.read()
+    digest = hashlib.sha256(raw).hexdigest()
+    stored = conn.execute("SELECT value FROM app_settings WHERE key = ?", (_RPE_SOURCE_KEY,)).fetchone()
+    count = conn.execute("SELECT COUNT(*) FROM rpe_chart").fetchone()[0]
+    if count > 0 and stored is not None and stored[0] == digest:
         return
-    with open(_RPE_CSV, newline="") as f:
-        reader = csv.DictReader(f)
-        conn.executemany(
-            "INSERT INTO rpe_chart (rpe, reps, percentage) VALUES (?, ?, ?)",
-            [(float(r["rpe"]), int(r["reps"]), float(r["percentage"])) for r in reader],
-        )
+    rows = [
+        (float(r["rpe"]), int(r["reps"]), float(r["percentage"]))
+        for r in csv.DictReader(io.StringIO(raw.decode("utf-8")))
+    ]
+    conn.execute("DELETE FROM rpe_chart")
+    conn.executemany("INSERT INTO rpe_chart (rpe, reps, percentage) VALUES (?, ?, ?)", rows)
+    conn.execute(
+        "INSERT INTO app_settings (key, value) VALUES (?, ?)"
+        " ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        (_RPE_SOURCE_KEY, digest),
+    )
 
 
 def get_rpe_percentage(rpe: float, reps: int) -> float | None:
