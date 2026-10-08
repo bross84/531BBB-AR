@@ -59,6 +59,13 @@
     .pill { align-self: center; padding: 8px 12px; min-height: 40px; border-radius: 20px; font-size: 13px; color: var(--muted); }
     .pill.on { color: var(--accent); border-color: var(--accent); }
     .set select.actual { border-color: var(--accent); color: var(--accent); }
+    .sec { font-size: 13px; font-weight: 500; color: var(--muted); margin: 14px 0 6px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+    .sq { aspect-ratio: 1 / 1; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start;
+          text-align: left; padding: 9px; min-height: 0; border-radius: 12px; background: var(--card); border: 1px solid var(--line); overflow: hidden; }
+    .sq .t { font-size: 13px; line-height: 1.25; font-weight: 500; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; }
+    .sq .m { font-size: 11px; color: var(--muted); }
+    .sq.recent { border-color: var(--accent); }
     .hint { font-size: 12px; color: var(--muted); margin: 6px 0 0; }
     .msg { border-radius: 10px; padding: 10px 12px; margin: 0 0 12px; font-size: 15px; }
     .msg.error { background: var(--danger-bg); color: var(--danger); }
@@ -112,6 +119,7 @@
       <input id="search" type="text" placeholder="Search exercises" autocomplete="off" style="flex:1" />
       <button id="closePicker" type="button">Cancel</button>
     </div>
+    <p id="syncnote" class="hint" hidden>Updating your exercise list from Hevy…</p>
     <div id="results"></div>
   </div>
 </div>
@@ -477,11 +485,43 @@
   $("again").addEventListener("click", () => { say(""); renderStart(); });
 
   // ── Add exercise ────────────────────────────────────────────────────────────
-  async function openPicker() {
-    $("picker").hidden = false; $("search").value = "";
-    $("results").replaceChildren(el("p", "muted", "Loading exercises…"));
-    try { catalog = catalog || (await api("/exercises")); } catch (err) { catalog = []; }
-    renderResults(); $("search").focus();
+  let refreshTried = false;
+
+  // Exercises from your recent Hevy workouts, most recently used first, each once.
+  function recentExercises() {
+    const seen = new Set(), list = [];
+    for (const w of (recentPage ? recentPage.workouts : [])) {
+      for (const ex of w.exercises) {
+        const id = ex.exercise_template_id;
+        if (!id || seen.has(id)) continue;
+        seen.add(id);
+        list.push({ id, title: ex.title });
+      }
+    }
+    return list;
+  }
+
+  function addExercise(e) {
+    const added = { id: uid(), template_id: e.id, title: e.title, notes: "", last: null, ref: refFromServer(e.id),
+      sets: [{ type: "normal", lb: "", reps: "", rpe: "", done: false, manual: false }] };
+    draft.exercises.push(added);
+    saveDraft(); $("picker").hidden = true; renderWorkout();
+    loadState(added);
+  }
+
+  function squareCard(e, isRecent, muscle) {
+    const b = el("button", "sq" + (isRecent ? " recent" : "")); b.type = "button"; b.title = e.title;
+    b.append(el("span", "t", e.title), el("span", "m", muscle || ""));
+    b.addEventListener("click", () => addExercise(e));
+    return b;
+  }
+
+  function section(box, title, items, recentIds, muscleOf) {
+    if (!items.length) return;
+    box.append(el("p", "sec", title));
+    const grid = el("div", "grid");
+    for (const e of items) grid.append(squareCard(e, recentIds.has(e.id), muscleOf(e.id)));
+    box.append(grid);
   }
 
   function renderResults() {
@@ -496,23 +536,49 @@
       });
       box.append(sync); return;
     }
-    const q = $("search").value.trim().toLowerCase();
-    const starts = catalog.filter((e) => e.title.toLowerCase().startsWith(q));
-    const rest = catalog.filter((e) => !e.title.toLowerCase().startsWith(q) && e.title.toLowerCase().includes(q));
-    const hits = (q ? starts.concat(rest) : catalog).slice(0, 15);
-    for (const e of hits) {
-      const b = el("button", "pick"); b.type = "button";
-      b.append(el("span", null, e.title), el("small", null, e.primary_muscle || ""));
-      b.addEventListener("click", () => {
-        const added = { id: uid(), template_id: e.id, title: e.title, notes: "", last: null, ref: refFromServer(e.id),
-          sets: [{ type: "normal", lb: "", reps: "", rpe: "", done: false, manual: false }] };
-        draft.exercises.push(added);
-        saveDraft(); $("picker").hidden = true; renderWorkout();
-        loadState(added);
-      });
-      box.append(b);
+    const muscles = new Map(catalog.map((e) => [e.id, e.primary_muscle]));
+    const muscleOf = (id) => muscles.get(id) || "";
+    const recents = recentExercises();
+    const recentIds = new Set(recents.map((e) => e.id));
+    const terms = $("search").value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+
+    if (!terms.length) {
+      section(box, "Recent", recents, recentIds, muscleOf);
+      section(box, "All exercises (" + catalog.length + ")", catalog, recentIds, muscleOf);
+      return;
     }
-    if (!hits.length) box.append(el("p", "muted", "No matches."));
+    // Every word must appear in the title. Recent exercises first, then titles starting with the first word.
+    const hit = (title) => { const t = title.toLowerCase(); return terms.every((x) => t.includes(x)); };
+    const pool = new Map();
+    for (const e of recents) if (hit(e.title)) pool.set(e.id, e);
+    for (const e of catalog) if (hit(e.title) && !pool.has(e.id)) pool.set(e.id, e);
+    const rank = (e) => (recentIds.has(e.id) ? 0 : e.title.toLowerCase().startsWith(terms[0]) ? 1 : 2);
+    const results = [...pool.values()].sort((a, b) => rank(a) - rank(b));
+    if (!results.length) { box.append(el("p", "muted", "No matches.")); return; }
+    section(box, "Results (" + results.length + ")", results, recentIds, muscleOf);
+  }
+
+  // Hevy's list changes (new custom exercises), so refresh the stored copy when it is old.
+  async function refreshCatalogIfStale() {
+    if (refreshTried) return;
+    const stamps = catalog.map((e) => Date.parse(String(e.cached_at).replace(" ", "T") + "Z")).filter((x) => !isNaN(x));
+    const newest = stamps.length ? Math.max(...stamps) : 0;
+    if (catalog.length && Date.now() - newest < 12 * 3600 * 1000) return;
+    refreshTried = true;
+    $("syncnote").hidden = false;
+    try { await api("/exercises/sync", { method: "POST" }); catalog = await api("/exercises"); }
+    catch (err) { /* keep the stored list */ }
+    finally { $("syncnote").hidden = true; }
+    renderResults();
+  }
+
+  async function openPicker() {
+    $("picker").hidden = false; $("search").value = "";
+    $("results").replaceChildren(el("p", "muted", "Loading exercises…"));
+    try { catalog = catalog || (await api("/exercises")); } catch (err) { catalog = []; }
+    if (!recentPage) { try { recentPage = await api("/hevy/workouts?page=1&page_size=10"); } catch (err) { /* no recents */ } }
+    renderResults(); $("search").focus();
+    refreshCatalogIfStale();
   }
 
   $("addEx").addEventListener("click", openPicker);
