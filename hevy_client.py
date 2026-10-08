@@ -185,18 +185,3 @@ class HevyClient:
             logger.exception("Hevy workout history fetch failed for exercise %s", hevy_exercise_id)
             return None
         return float(round_weight(best)) if best is not None else None
-
-    def post_workout(self, payload: dict) -> str | None:
-        """Post a completed session to Hevy. Returns the Hevy workout ID or None on failure."""
-        try:
-            with httpx.Client(timeout=30) as client:
-                resp = client.post(
-                    f"{_BASE_URL}/workouts",
-                    headers=self._headers(),
-                    json=payload,
-                )
-                resp.raise_for_status()
-                return resp.json().get("workout", {}).get("id")
-        except Exception:
-            logger.exception("Hevy write-back failed — session already saved to local DB.")
-            return None

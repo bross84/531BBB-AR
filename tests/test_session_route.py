@@ -7,7 +7,7 @@ Pins CURRENT behaviour so the notation/load-rule refactor cannot silently change
 Tests marked expectedFailure describe intended behaviour that is currently broken; they
 flip to "unexpected success" when the bug is fixed — remove the decorator then.
 
-Runs against a throwaway SQLite DB (DB_PATH) and a mocked Hevy client — no network.
+Runs against a throwaway SQLite DB (DB_PATH) — no network.
 """
 import json
 import os
@@ -16,7 +16,6 @@ import sys
 import tempfile
 import unittest
 import warnings
-from unittest import mock
 
 # Starlette's TestClient leaves anyio memory streams to the GC; the warnings bury real output.
 warnings.filterwarnings("ignore", category=ResourceWarning)
@@ -300,10 +299,6 @@ class TestSessionLogging(SessionRouteCase):
 
     def setUp(self):
         super().setUp()
-        patcher = mock.patch("main.hevy_client.HevyClient")
-        self.hevy = patcher.start().return_value
-        self.hevy.post_workout.return_value = None
-        self.addCleanup(patcher.stop)
         self.slot = self._slot([_set(5, 8)], "e1rm")
         self.block = self._start_block()
 
@@ -378,19 +373,6 @@ class TestSessionLogging(SessionRouteCase):
     def test_working_sets_do_not_write_e1rm(self):
         self._post([_log(self.slot, 1, "working", 100, 5, rpe=8)])
         self.assertEqual([], self._e1rm_rows())
-
-    def test_hevy_id_written_back_on_success(self):
-        self.hevy.post_workout.return_value = "hevy-123"
-        r = self._post([_log(self.slot, 1, "working", 100, 5)])
-        self.assertEqual({"session_logged": True, "hevy_synced": True}, r.json())
-        self.assertEqual("hevy-123", self._query("SELECT hevy_workout_id FROM session_log")[0]["hevy_workout_id"])
-
-    def test_hevy_failure_never_blocks_the_session_save(self):
-        self.hevy.post_workout.side_effect = RuntimeError("hevy down")
-        r = self._post([_log(self.slot, 1, "working", 100, 5)])
-        self.assertEqual(200, r.status_code)
-        self.assertEqual({"session_logged": True, "hevy_synced": False}, r.json())
-        self.assertEqual(1, len(self._query("SELECT id FROM session_log")))
 
     def test_manual_e1rm_rounds_and_appears_in_history(self):
         r = self.client.post(f"/active-blocks/{self.block}/e1rm", json={"slot_id": self.slot, "e1rm_kg": 201.3})

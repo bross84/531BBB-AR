@@ -44,12 +44,12 @@ Template fields: `id`, `title`, `type`, `primary_muscle_group`, `secondary_muscl
 
 ## Gaps in this repo versus the spec (found 2026-10-05)
 
-1. `main.py` write-back builds `{title, startTime, endTime, exercises:[{exerciseTemplateId, sets:[{type, weightKg, reps}]}]}`: not wrapped in `workout`, camelCase instead of snake_case, no `rpe`, and set types `working` / `amrap` / `joker` that Hevy does not accept. By the spec this request would be rejected. It has never been exercised (zero logged sessions; the tests mock the client).
+1. *(Fixed 2026-10-08: the old write-back in `main.py` and `HevyClient.post_workout` were removed. `build_hevy_workout` + `HevyClient.create_workout` are the only way this app writes to Hevy.)* It built `{title, startTime, endTime, exercises:[...]}` with camelCase keys, no `workout` wrapper, no `rpe` and set types Hevy does not accept.
 2. Program import accepts exercise names that are not in the cache (stores an empty `hevy_exercise_id` and reports an error).
 3. History is never read except `best_e1rm_from_hevy`, which is unused after the June change.
 4. `workouts/events` is not used, so the local cache of Hevy data is never refreshed incrementally.
 5. RPE below 6 (used in the user's programs) has no Hevy representation.
-6. `HevyClient.post_workout` reads the 201 response as an object (`.get("workout", {}).get("id")`), but Hevy returns a list, so even a valid request would lose the workout id.
+6. *(Fixed 2026-10-08, same removal.)* `post_workout` read the 201 response as an object, but Hevy returns a list; `create_workout` handles the list.
 
 ## Existing AI tooling (web search 2026-10-05; listings read, code NOT audited)
 
