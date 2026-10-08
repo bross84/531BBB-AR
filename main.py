@@ -19,6 +19,7 @@ from database import get_db, get_rpe_percentage, init_db
 import hevy_client
 import program_parser
 from wave_math import bbb_weight, epley, joker_qualifies, joker_weight, round_weight, session_e1rm, working_weight
+from workout_payload import build_hevy_workout
 from workout_view import summarize_workout
 
 logger = logging.getLogger(__name__)
@@ -86,13 +87,10 @@ def recent_page():
     return FileResponse("recent.html")
 
 
-@app.get("/hevy/workouts", response_model=WorkoutsPage)
-def list_hevy_workouts(
-    page: int = Query(1, ge=1),
-    page_size: int = Query(10, ge=1, le=10),  # Hevy allows at most 10 workouts per page
-):
+def _call_hevy(call):
+    """Run call(HevyClient) and translate Hevy and key failures into HTTP errors."""
     try:
-        data = hevy_client.HevyClient().list_workouts(page=page, page_size=page_size)
+        return call(hevy_client.HevyClient())
     except InvalidToken:
         raise HTTPException(
             status_code=400,
@@ -102,20 +100,78 @@ def list_hevy_workouts(
         raise HTTPException(status_code=400, detail=str(exc))
     except httpx.HTTPStatusError as exc:
         status = exc.response.status_code
-        detail = (
-            "Hevy rejected the API key. Check that it's current and that your account is Hevy Pro."
-            if status in (401, 403)
-            else f"Hevy returned an error ({status})."
-        )
+        if status in (401, 403):
+            detail = "Hevy rejected the API key. Check that it's current and that your account is Hevy Pro."
+        else:
+            detail = f"Hevy returned an error ({status})."
+            try:
+                message = exc.response.json().get("error")
+            except ValueError:
+                message = None
+            if message:
+                detail += f" {message}"
         raise HTTPException(status_code=502, detail=detail)
     except httpx.RequestError:
         raise HTTPException(status_code=502, detail="Couldn't reach Hevy.")
 
+
+@app.get("/hevy/workouts", response_model=WorkoutsPage)
+def list_hevy_workouts(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=10),  # Hevy allows at most 10 workouts per page
+):
+    data = _call_hevy(lambda client: client.list_workouts(page=page, page_size=page_size))
     return {
         "page": int(data.get("page", page)),
         "page_count": int(data.get("page_count", 1)),
         "workouts": [summarize_workout(w) for w in data.get("workouts", [])],
     }
+
+
+# ── Log a workout (write to Hevy) ──────────────────────────────────────────────
+
+class EntrySet(BaseModel):
+    type: Literal["warmup", "normal", "failure", "dropset"] = "normal"
+    weight_lb: float | None = Field(default=None, ge=0)
+    reps: int | None = Field(default=None, ge=0)
+    rpe: float | None = None
+
+
+class EntryExercise(BaseModel):
+    exercise_template_id: str
+    title: str | None = None
+    notes: str | None = None
+    sets: list[EntrySet]
+
+
+class WorkoutEntry(BaseModel):
+    title: str
+    description: str | None = None
+    start_time: str
+    end_time: str
+    exercises: list[EntryExercise]
+
+
+class SavedWorkout(BaseModel):
+    id: str | None = None
+    warnings: list[str]
+
+
+@app.get("/log")
+def log_page():
+    return FileResponse("log.html")
+
+
+@app.post("/hevy/workouts", response_model=SavedWorkout)
+def create_hevy_workout(entry: WorkoutEntry):
+    """Save a logged workout (weights in lb) to Hevy. Hevy has no delete endpoint, so each call
+    that succeeds creates a real workout in the account."""
+    try:
+        body, warnings = build_hevy_workout(entry.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    created = _call_hevy(lambda client: client.create_workout(body))
+    return {"id": created.get("id"), "warnings": warnings}
 
 
 # ── Settings ───────────────────────────────────────────────────────────────────

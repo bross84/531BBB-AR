@@ -130,5 +130,88 @@ class TestRecentPage(WorkoutsRouteCase):
         self.assertIn("Recent workouts", r.text)
 
 
+ENTRY = {
+    "title": "BS-Bridge 1.3.3",
+    "start_time": "2026-10-09T17:00:00Z",
+    "end_time": "2026-10-09T18:00:00Z",
+    "exercises": [
+        {
+            "exercise_template_id": "tpl-squat",
+            "title": "Squat, Low Bar w/ Belt",
+            "sets": [
+                {"type": "warmup", "weight_lb": 110, "reps": 5},
+                {"type": "normal", "weight_lb": 265, "reps": 5, "rpe": 6},
+                {"type": "normal", "weight_lb": 281, "reps": 8, "rpe": 5},
+            ],
+        }
+    ],
+}
+
+
+class TestCreateHevyWorkout(WorkoutsRouteCase):
+
+    def setUp(self):
+        super().setUp()
+        self.hevy.create_workout.return_value = {"id": "new-1"}
+
+    def _post(self, **overrides):
+        return self.client.post("/hevy/workouts", json={**ENTRY, **overrides})
+
+    def test_saves_and_returns_the_new_id(self):
+        r = self._post()
+        self.assertEqual(200, r.status_code, r.text)
+        self.assertEqual("new-1", r.json()["id"])
+
+    def test_sends_hevys_body_with_kg_and_wrapped_in_workout(self):
+        self._post()
+        (body,), _ = self.hevy.create_workout.call_args
+        w = body["workout"]
+        self.assertEqual("BS-Bridge 1.3.3", w["title"])
+        sets = w["exercises"][0]["sets"]
+        self.assertEqual([49.9, 120.2, 127.46], [s["weight_kg"] for s in sets])
+        self.assertEqual("tpl-squat", w["exercises"][0]["exercise_template_id"])
+
+    def test_unstorable_rpe_is_dropped_and_reported(self):
+        r = self._post()
+        self.assertEqual(1, len(r.json()["warnings"]))
+        self.assertIn("RPE 5", r.json()["warnings"][0])
+        (body,), _ = self.hevy.create_workout.call_args
+        self.assertIsNone(body["workout"]["exercises"][0]["sets"][2]["rpe"])
+
+    def test_invalid_workout_is_422_and_nothing_is_sent(self):
+        for bad in ({"exercises": []}, {"title": " "}, {"end_time": "2026-10-09T16:00:00Z"}):
+            r = self._post(**bad)
+            self.assertEqual(422, r.status_code, bad)
+        self.hevy.create_workout.assert_not_called()
+
+    def test_unknown_set_type_is_rejected(self):
+        entry = {**ENTRY, "exercises": [{"exercise_template_id": "t", "sets": [{"type": "amrap", "reps": 5}]}]}
+        self.assertEqual(422, self.client.post("/hevy/workouts", json=entry).status_code)
+
+    def test_no_api_key_is_a_400(self):
+        self.hevy_cls.side_effect = ValueError("No Hevy API key configured.")
+        self.assertEqual(400, self._post().status_code)
+
+    def test_hevy_validation_error_message_is_passed_along(self):
+        request = httpx.Request("POST", "https://api.hevyapp.com/v1/workouts")
+        response = httpx.Response(400, request=request, json={"error": "Invalid exercise_template_id"})
+        self.hevy.create_workout.side_effect = httpx.HTTPStatusError("bad", request=request, response=response)
+        r = self._post()
+        self.assertEqual(502, r.status_code)
+        self.assertIn("Invalid exercise_template_id", r.json()["detail"])
+
+    def test_hevy_unreachable_is_a_502(self):
+        self.hevy.create_workout.side_effect = httpx.ConnectError("down")
+        self.assertEqual(502, self._post().status_code)
+
+
+class TestLogPage(WorkoutsRouteCase):
+
+    def test_log_page_is_served(self):
+        r = self.client.get("/log")
+        self.assertEqual(200, r.status_code)
+        self.assertIn("Log workout", r.text)
+
+
 if __name__ == "__main__":
     unittest.main()
