@@ -18,10 +18,6 @@ SET_TYPES = ("warmup", "normal", "failure", "dropset")
 HEVY_RPE_VALUES = (6.0, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0)
 
 
-def lb_to_kg(lb: float) -> float:
-    return round(lb * LB_TO_KG, 2)
-
-
 def lb_to_plate_kg(lb: float) -> float:
     """The kg actually on the bar for a weight typed in lb: the nearest half kilo."""
     return math.floor(lb * LB_TO_KG * 2 + 0.5) / 2

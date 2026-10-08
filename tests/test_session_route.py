@@ -1,7 +1,7 @@
 """
 Characterisation tests for the session routes in main.py:
   GET  /active-blocks/{id}/session   (planned weights per source)
-  POST /active-blocks/{id}/session   (set logging, e1RM write, Hevy write-back)
+  POST /active-blocks/{id}/session   (set logging, e1RM write)
 
 Pins CURRENT behaviour so the notation/load-rule refactor cannot silently change it.
 Tests marked expectedFailure describe intended behaviour that is currently broken; they
@@ -185,7 +185,7 @@ class TestPlannedWeights(SessionRouteCase):
             "INSERT INTO days (block_id, day_number) VALUES (?, 2)", (self.micro_id,)
         )
         other_slot = self._slot([_set(5, 8)], "e1rm", day_id=other_day)
-        slot = self._slot(self.RPE_LIST, "e1rm")
+        self._slot(self.RPE_LIST, "e1rm")
         block = self._start_block()
         self._log_e1rm(block, other_slot, 200.0)  # logged on a different slot, same exercise
         self.assertEqual([155.0, 160.0, 165.0], self._planned(block))

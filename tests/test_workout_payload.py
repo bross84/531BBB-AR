@@ -4,7 +4,7 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from workout_payload import build_hevy_workout, lb_to_kg, lb_to_plate_kg
+from workout_payload import build_hevy_workout, lb_to_plate_kg
 
 
 def _entry(**overrides):
@@ -29,12 +29,6 @@ def _entry(**overrides):
 
 
 class TestConversion(unittest.TestCase):
-
-    def test_lb_to_kg_matches_what_hevy_stored_for_the_users_lifts(self):
-        # Values read from the user's own Hevy history (lb typed -> kg stored).
-        self.assertEqual(120.2, lb_to_kg(265))
-        self.assertEqual(127.46, lb_to_kg(281))
-        self.assertEqual(132.45, lb_to_kg(292))
 
     def test_plate_kg_is_the_nearest_half_kilo(self):
         self.assertEqual(90.0, lb_to_plate_kg(198))   # 90 kg loaded, 198 lb typed

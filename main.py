@@ -7,7 +7,6 @@ import httpx
 from cryptography.fernet import InvalidToken
 from fastapi import FastAPI, HTTPException, Query, Response
 from fastapi.responses import FileResponse, RedirectResponse
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
@@ -555,16 +554,6 @@ def _wave_param_number(wave_params: dict[str, Any], keys: list[str]) -> float | 
         except (TypeError, ValueError):
             continue
     return None
-
-
-def _wave_param_int(wave_params: dict[str, Any], key: str) -> int | None:
-    value = wave_params.get(key)
-    if value is None:
-        return None
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return None
 
 
 def _slot_in_program(conn, slot_id: int, program_id: int) -> dict[str, Any] | None:
