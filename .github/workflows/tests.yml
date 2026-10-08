@@ -14,8 +14,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     env:
-      # Stops anything that touches the API-key encryption from writing to /data on the runner.
-      FERNET_KEY_PATH: ${{ runner.temp }}/app.key
+      # Keeps anything that touches the API-key encryption out of /data on the runner.
+      FERNET_KEY_PATH: /tmp/app.key
     steps:
       - uses: actions/checkout@v4
 
