@@ -142,7 +142,10 @@
   function trim(n) { return String(Number(Number(n).toFixed(2))); }
 
   function loadDraft() { try { return JSON.parse(localStorage.getItem(KEY)); } catch (e) { return null; } }
-  function saveDraft() { try { localStorage.setItem(KEY, JSON.stringify(draft)); } catch (e) {} }
+  function saveDraft() {
+    try { localStorage.setItem(KEY, JSON.stringify(draft)); } catch (e) {}
+    if (draft) draft.exercises.forEach(refreshE1rm);
+  }
   function clearDraft() { draft = null; try { localStorage.removeItem(KEY); } catch (e) {} }
 
   function say(text, kind) {
@@ -201,14 +204,62 @@
     return null;
   }
 
+  // The highest e1RM among the sets ticked done so far (weight / table percentage for the logged RPE), or null.
+  function bestSetToday(ex) {
+    let best = null, working = 0;
+    ex.sets.forEach((s) => {
+      if (s.type !== "warmup") working += 1;
+      if (!s.done || s.type === "warmup") return;
+      const lb = parseFloat(s.lb), reps = parseInt(s.reps, 10), rpe = parseFloat(s.arpe || s.rpe);
+      if (!(lb > 0) || !(reps > 0) || isNaN(rpe)) return;
+      const pct = pctFor(rpe, reps);
+      if (!pct) return;
+      const e1 = lb / pct;
+      if (!best || e1 >= best.e1) best = { e1, set: working, lb, reps, rpe };
+    });
+    return best;
+  }
+
+  // The movement's current e1RM: its best set today, until a set is done the one from the last session.
+  function currentE1rm(ex) {
+    const best = bestSetToday(ex);
+    if (best) return { value: best.e1, best };
+    const st = ex.ref.state;
+    return st && st.found ? { value: st.e1rm_lb, best: null } : null;
+  }
+
+  function refNote(ex) {
+    const cur = currentE1rm(ex), st = ex.ref.state;
+    if (cur && cur.best) {
+      const b = cur.best;
+      return "Best set today (set " + b.set + "): " + Math.round(b.lb) + " lb × " + b.reps + " @" + b.rpe;
+    }
+    if (!st) return "Working out your e1RM from your last session…";
+    if (!st.found) return "No RPE history for this movement yet." + (st.error ? " (" + st.error + ")" : "");
+    const rpe = st.set_rpe != null ? " @" + st.set_rpe : "";
+    return "From " + (st.workout_title || "last session") + ", " + fmtShortDate(st.workout_start_time) + ": " + Math.round(st.set_weight_lb) + " lb × " + st.set_reps + rpe;
+  }
+
+  // Keep the e1RM tile and its note current as sets change, without rebuilding the card.
+  function refreshE1rm(ex) {
+    const card = cardEls.get(ex.id);
+    if (!card) return;
+    const tv = card.querySelector(".e1v"), note = card.querySelector(".refnote");
+    if (!tv || !note) return;
+    const cur = currentE1rm(ex);
+    tv.textContent = cur ? String(Math.round(cur.value)) : (ex.ref.state ? "–" : "…");
+    note.textContent = refNote(ex);
+  }
+
   function baseFor(ex, index) {
     if (ex.ref.ls) {
       const v = lastSetE1rm(ex, index);
       if (v) return v;
     }
     const st = ex.ref.state;
-    if (!st || !st.found) return null;
-    return ex.ref.basis === "tm" ? st.e1rm_lb * ex.ref.tmPct : st.e1rm_lb;
+    if (ex.ref.basis === "tm") return st && st.found ? st.e1rm_lb * ex.ref.tmPct : null;
+    const cur = currentE1rm(ex);
+    return cur ? cur.value : null;
   }
 
   function autoWeight(ex, index) {
@@ -352,7 +403,7 @@
   function renderRefBar(ex) {
     const wrap = el("div", "refbar");
     const st = ex.ref.state, found = !!(st && st.found);
-    const show = (v) => (!st ? "…" : v == null ? "–" : String(v));
+    const show = (v) => (v != null ? String(v) : !st ? "…" : "–");
 
     const tiles = el("div", "tiles");
     const tile = (key, label, value) => {
@@ -368,7 +419,10 @@
       return t;
     };
 
-    tiles.append(tile("e1rm", el("span", "tl", "e1RM"), show(found ? Math.round(st.e1rm_lb) : null)));
+    const cur = currentE1rm(ex);
+    const e1Tile = tile("e1rm", el("span", "tl", "e1RM"), show(cur ? Math.round(cur.value) : null));
+    e1Tile.querySelector(".tv").classList.add("e1v");
+    tiles.append(e1Tile);
 
     const tmLabel = el("span", "tl");
     tmLabel.append("TM ");
@@ -392,14 +446,7 @@
     tiles.append(ls);
     wrap.append(tiles);
 
-    let note;
-    if (!st) note = "Working out your e1RM from your last session…";
-    else if (!found) note = "No RPE history for this movement yet." + (st.error ? " (" + st.error + ")" : "");
-    else {
-      const rpe = st.set_rpe != null ? " @" + st.set_rpe : "";
-      note = "From " + (st.workout_title || "last session") + ", " + fmtShortDate(st.workout_start_time) + ": " + Math.round(st.set_weight_lb) + " lb × " + st.set_reps + rpe;
-    }
-    wrap.append(el("p", "hint", note));
+    wrap.append(el("p", "hint refnote", refNote(ex)));
     return wrap;
   }
 
