@@ -170,6 +170,7 @@ class ExerciseRefInput(BaseModel):
     basis: Literal["e1rm", "tm"] = "e1rm"
     ls: bool = True  # plan the next set from the last set's e1RM (LSe1RM)
     tm_pct: float = Field(default=refs_store.DEFAULT_TM_PCT, ge=0.5, le=1.0)
+    step_kg: float = Field(default=refs_store.DEFAULT_STEP_KG, ge=0.25, le=10.0)  # plate step planned weights round to
 
 
 class ExerciseRef(ExerciseRefInput):
@@ -206,7 +207,7 @@ def list_exercise_refs():
 
 @app.put("/exercise-refs/{exercise_template_id}", response_model=ExerciseRef)
 def put_exercise_ref(exercise_template_id: str, data: ExerciseRefInput):
-    return refs_store.save_ref(exercise_template_id, data.basis, data.ls, data.tm_pct)
+    return refs_store.save_ref(exercise_template_id, data.basis, data.ls, data.tm_pct, data.step_kg)
 
 
 @app.get("/hevy/exercise-state/{exercise_template_id}", response_model=ExerciseState)

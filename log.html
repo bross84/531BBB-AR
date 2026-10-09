@@ -58,6 +58,8 @@
     .tile.on { border-color: var(--accent); background: transparent; }
     .tile.on .tv { color: var(--accent); }
     .tile .pctin { width: 34px; min-height: 0; height: 20px; padding: 0 2px; font-size: 11px; text-align: center; border-radius: 6px; background: var(--bg); }
+    .stepline { display: block; margin: 4px 0 0; }
+    .stepline select { min-height: 0; padding: 2px 4px; font-size: 13px; }
     .pill { align-self: center; padding: 8px 12px; min-height: 40px; border-radius: 20px; font-size: 13px; color: var(--muted); }
     .pill.on { color: var(--accent); border-color: var(--accent); }
     .set select.actual { border-color: var(--accent); color: var(--accent); }
@@ -174,19 +176,19 @@
   // Weights always fill in from RPE. Per movement two things are chosen: the base (e1RM or TM, both worked
   // out from the movement's last session in Hevy) and whether the last set's e1RM (LSe1RM) feeds the next set.
   function pctFor(rpe, reps) { return rpeTable.get(rpe + "|" + reps); }
-  // Round to the nearest 2.5 kg plate step, then show whole pounds (120 kg -> 265 lb).
-  function plateLb(rawLb) { return Math.round(Math.round(rawLb / LB_PER_KG / 2.5) * 2.5 * LB_PER_KG); }
+  // Round to the movement's plate step (2.5 kg unless set otherwise), then show whole pounds (120 kg -> 265 lb).
+  function plateLb(rawLb, stepKg) { const step = stepKg || 2.5; return Math.round(Math.round(rawLb / LB_PER_KG / step) * step * LB_PER_KG); }
   // The kg to put on the bar for a weight typed in pounds, to the nearest half kilo (198 lb -> 90 kg).
   function kgText(lb) {
     const v = Number(lb);
     return v > 0 ? trim(Math.round(v / LB_PER_KG * 2) / 2) + " kg" : "";
   }
   function showKg(s) { const label = kgLabels.get(s); if (label) label.textContent = kgText(s.lb); }
-  function defaultRef() { return { basis: "e1rm", ls: true, tmPct: 0.95, state: null }; }
+  function defaultRef() { return { basis: "e1rm", ls: true, tmPct: 0.95, stepKg: 2.5, state: null }; }
   function refFromServer(id) {
     const r = refs[id];
     if (!r) return defaultRef();
-    return { basis: r.basis, ls: r.ls, tmPct: r.tm_pct, state: null };
+    return { basis: r.basis, ls: r.ls, tmPct: r.tm_pct, stepKg: r.step_kg || 2.5, state: null };
   }
 
   // The e1RM of the nearest earlier set that is ticked done and has weight, reps and an RPE.
@@ -265,7 +267,7 @@
     const base = baseFor(ex, index), reps = parseInt(s.reps, 10), rpe = parseFloat(s.rpe);
     if (!base || !(reps > 0) || isNaN(rpe)) return null;
     const pct = pctFor(rpe, reps);
-    return pct ? plateLb(base * pct) : null;
+    return pct ? plateLb(base * pct, ex.ref.stepKg) : null;
   }
 
   // Fill weights from RPE. Never touches a set that is ticked done or whose weight was typed by hand.
@@ -303,7 +305,7 @@
     const id = ex.template_id;
     clearTimeout(refTimers[id]);
     refTimers[id] = setTimeout(async () => {
-      const body = { basis: ex.ref.basis, ls: ex.ref.ls, tm_pct: ex.ref.tmPct };
+      const body = { basis: ex.ref.basis, ls: ex.ref.ls, tm_pct: ex.ref.tmPct, step_kg: ex.ref.stepKg };
       try {
         refs[id] = await api("/exercise-refs/" + encodeURIComponent(id), {
           method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
@@ -445,6 +447,19 @@
     wrap.append(tiles);
 
     wrap.append(el("p", "hint refnote", refNote(ex)));
+
+    const stepLine = el("label", "hint stepline", "Round weights to ");
+    const step = el("select");
+    step.setAttribute("aria-label", "Round planned weights to this many kg");
+    const steps = [0.5, 1, 1.25, 2.5, 5];
+    if (!steps.includes(ex.ref.stepKg)) steps.push(ex.ref.stepKg);
+    for (const v of steps) { const o = el("option", null, trim(v)); o.value = String(v); step.append(o); }
+    step.value = String(ex.ref.stepKg);
+    step.addEventListener("change", () => {
+      ex.ref.stepKg = Number(step.value); applyAuto(ex); saveDraft(); saveRef(ex); refreshCard(ex);
+    });
+    stepLine.append(step, " kg");
+    wrap.append(stepLine);
     return wrap;
   }
 
@@ -692,7 +707,7 @@
     if (draft && Array.isArray(draft.exercises)) {
       for (const ex of draft.exercises) {
         const old = ex.ref || {};
-        ex.ref = { basis: old.basis || "e1rm", ls: old.ls === undefined ? true : old.ls, tmPct: old.tmPct || 0.95, state: old.state || null };
+        ex.ref = { basis: old.basis || "e1rm", ls: old.ls === undefined ? true : old.ls, tmPct: old.tmPct || 0.95, stepKg: old.stepKg || 2.5, state: old.state || null };
         for (const s of ex.sets) if (s.manual === undefined) s.manual = false;
       }
       renderWorkout();

@@ -46,13 +46,13 @@ class TestMovementSettings(RefsCase):
     def test_defaults_are_e1rm_last_set_on_and_95_percent(self):
         r = self.client.put("/exercise-refs/tpl-bench", json={})
         self.assertEqual(
-            {"exercise_template_id": "tpl-bench", "basis": "e1rm", "ls": True, "tm_pct": 0.95}, r.json()
+            {"exercise_template_id": "tpl-bench", "basis": "e1rm", "ls": True, "tm_pct": 0.95, "step_kg": 2.5}, r.json()
         )
 
     def test_save_and_list(self):
         r = self.client.put("/exercise-refs/tpl-squat", json={"basis": "tm", "ls": False, "tm_pct": 0.9})
         self.assertEqual(200, r.status_code, r.text)
-        expected = {"exercise_template_id": "tpl-squat", "basis": "tm", "ls": False, "tm_pct": 0.9}
+        expected = {"exercise_template_id": "tpl-squat", "basis": "tm", "ls": False, "tm_pct": 0.9, "step_kg": 2.5}
         self.assertEqual(expected, r.json())
         self.assertEqual([expected], self.client.get("/exercise-refs").json())
 
@@ -75,6 +75,16 @@ class TestMovementSettings(RefsCase):
         for bad in ({"basis": "percent"}, {"tm_pct": 0.2}, {"tm_pct": 1.5}):
             self.assertEqual(422, self.client.put("/exercise-refs/x", json=bad).status_code, bad)
 
+    def test_the_rounding_step_is_saved_per_movement(self):
+        self.client.put("/exercise-refs/pullup", json={"step_kg": 0.5})
+        self.client.put("/exercise-refs/squat", json={})
+        steps = {r["exercise_template_id"]: r["step_kg"] for r in self.client.get("/exercise-refs").json()}
+        self.assertEqual({"pullup": 0.5, "squat": 2.5}, steps)
+
+    def test_rejects_a_silly_rounding_step(self):
+        for bad in (0, -1, 0.1, 25):
+            self.assertEqual(422, self.client.put("/exercise-refs/x", json={"step_kg": bad}).status_code, bad)
+
     def test_a_database_from_the_earlier_version_gains_the_new_columns(self):
         path = os.environ["DB_PATH"]
         conn = sqlite3.connect(path)
@@ -88,7 +98,7 @@ class TestMovementSettings(RefsCase):
         conn.close()
         database.init_db()
         self.assertEqual(
-            [{"exercise_template_id": "old", "basis": "tm", "ls": True, "tm_pct": 0.95}],
+            [{"exercise_template_id": "old", "basis": "tm", "ls": True, "tm_pct": 0.95, "step_kg": 2.5}],
             self.client.get("/exercise-refs").json(),
         )
 
