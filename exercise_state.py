@@ -42,9 +42,10 @@ def sessions_newest_first(entries: list[dict[str, Any]]) -> list[list[dict[str, 
 
 def reference_set(session: list[dict[str, Any]], pct: PctLookup) -> dict[str, Any] | None:
     """
-    The set that stands for a session: the heaviest working set that has reps, an RPE and a table value.
-    (Interim rule. Which set the user means by their "top set" is not settled; the result always reports
-    the set it used so the page can show it.) A tie goes to the later set.
+    The set that stands for a session: the working set with the highest e1RM, among those that have
+    reps, an RPE and a table value. The heaviest set is not always the best one (weight can drop while
+    the RPE climbs). The result always reports the set it used so the page can show it. A tie goes to
+    the later set.
     """
     best = None
     for entry in session:
@@ -57,7 +58,7 @@ def reference_set(session: list[dict[str, Any]], pct: PctLookup) -> dict[str, An
         e1rm = e1rm_lb(lb, reps, rpe, pct)
         if e1rm is None:
             continue
-        if best is None or lb >= best["weight_lb"]:
+        if best is None or e1rm >= best["e1rm_lb"]:
             best = {"weight_lb": lb, "reps": int(reps), "rpe": float(rpe), "e1rm_lb": e1rm, "entry": entry}
     return best
 
