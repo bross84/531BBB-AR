@@ -17,7 +17,7 @@ Use the phase checklists below during execution, and include the Post-implementa
 - [ ] If editing `wave_math.py`: confirm every function remains pure — no DB access, no HTTP calls, no side effects.
 - [ ] Select a workflow and record it in the Implementation Report before writing anything:
    - **Express** — ≤2 files, ≤50 lines, no architectural impact
-   - **Main** — new feature, multi-file, or touches wave math or Hevy write-back
+   - **Main** — new feature, multi-file, or touches wave math or the Hevy workout create
    - **Debug** — specific bug with a known reproduction path
    - **Loop** — same change across multiple files
 
@@ -35,7 +35,7 @@ If the spec is unclear: ask one focused question and stop. Escalate to Brian if 
 - [ ] Delete any gate test files created during this task before marking complete.
 - [ ] Confirm no weights are displayed or stored without rounding to nearest 2.5 kg.
 - [ ] Confirm `DB_PATH` is read from `os.environ` — never hardcoded — in any edited file.
-- [ ] Confirm Hevy write-back failures are logged and do not raise or block session save.
+- [ ] Confirm only `POST /hevy/workouts` writes to Hevy.
 
 ## Debugging checklist
 
@@ -65,7 +65,7 @@ End every task with this:
 - [ ] Delete gate test files
 - [ ] Weights rounded to nearest 2.5 kg
 - [ ] DB_PATH from os.environ confirmed
-- [ ] Hevy write-back failure handling confirmed
+- [ ] Hevy writes only via `POST /hevy/workouts` confirmed
 **Out-of-scope observations:** [file and line, or none]  
 **Self-validation:** Correctness / Robustness / Simplicity / Consistency / Scope — [PASS or FAIL]  
 **Status:** [COMPLETED | PARTIALLY COMPLETED | FAILED | BLOCKED]

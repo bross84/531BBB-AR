@@ -28,9 +28,9 @@ Read this file at the start of every task. Do not proceed if it is missing.
 | `main.py` | FastAPI app entry point, all API route definitions |
 | `database.py` | `init_db()`, schema DDL, `get_db()` helper |
 | `wave_math.py` | Pure functions — e1RM, Joker filter, weight rounding, BBB weight |
-| `hevy_client.py` | Hevy API HTTP client — exercise cache sync, workout write-back |
+| `hevy_client.py` | Hevy API HTTP client — exercise cache sync, recent workouts, exercise history, workout create |
 | `index.html` | Entire frontend |
-| `docker-compose.yml` | Deployment — contains CasaOS metadata, **do not alter** |
+| `docker-compose.yml` | Deployment |
 | `requirements.txt` | Must stay in sync with all imports in `.py` files |
 
 ---
@@ -234,15 +234,13 @@ app_settings
 
 - Pulled from `GET /v1/exercise_templates` at setup.
 - Stored in `hevy_exercise_cache`. Refreshable via `POST /exercises/sync`.
-- `hevy_exercise_cache.id` is the `exerciseTemplateId` used in write-back payloads.
+- `hevy_exercise_cache.id` is the `exerciseTemplateId` used in workout payloads.
 
-### Workout write-back
+### Workout create
 
-- Triggered after a session is submitted.
-- Endpoint: `POST /v1/workouts` on the Hevy API.
-- Payload uses `exerciseTemplateId` from `hevy_exercise_cache`.
-- **Failures must be logged and must not raise or block the session save.** The session is always written to `session_log` first; Hevy write-back is best-effort.
-- The resulting `hevy_workout_id` is stored back to `session_log.hevy_workout_id` on success.
+- Only the `/log` page writes to Hevy: `POST /hevy/workouts` builds the body with `build_hevy_workout` and sends it with `HevyClient.create_workout` (`POST /v1/workouts`).
+- Hevy has no delete endpoint, so every success creates a permanent workout. Test with the request mocked.
+- The original app (`/legacy`) saves sessions locally only and no longer posts to Hevy. `session_log.hevy_workout_id` is no longer written.
 
 ### API key
 
@@ -261,8 +259,7 @@ Stored in `app_settings` table under a known key. Never hardcoded, never committ
 | `wave_math.py` | Pure functions only — no DB, no HTTP, no side effects. |
 | Frontend libraries | Chart.js only. No bundler, no build step. |
 | Frontend structure | All HTML/CSS/JS stays in `index.html`. Do not split. |
-| `docker-compose.yml` | Do not alter CasaOS metadata. |
-| Hevy write-back | Log failures; never raise or block session save. |
+| Hevy writes | Only via `POST /hevy/workouts`; errors come back as HTTP errors (`_call_hevy` in `main.py`). |
 | Schema changes | Always verify columns with `PRAGMA table_info`. Never assume. |
 | Deletions | No permanent deletions without explicit written instruction. |
 | Commits | Brian commits after review. Implementer does not `git commit` or `git push`. |

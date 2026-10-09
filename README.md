@@ -11,8 +11,8 @@ Deployed via Docker on CasaOS, used as a desktop PWA and mobile PWA.
 - **Program designer** — author multi-week training blocks ahead of time (Main / BBB / Accessory tier model, 3-week wave, 8-week block minimum, 4 days per week)
 - **Autoregulated weights** — working weights computed at session time from a live e1RM, anchored by AMRAP sets and averaged Joker sets within a ±5% band
 - **BBB volume** — starting weight derived from averaged e1RM × 65/70/75% by wave week; freely overridable per session
-- **Hevy write-back** — completed sessions posted to Hevy via `POST /v1/workouts` using `exerciseTemplateId`
-- **Exercise cache** — Hevy exercise list pulled and cached at setup, used throughout for slot configuration and write-back
+- **Hevy logging** — the workout log page (`/log`) saves a finished workout to Hevy via `POST /v1/workouts`; the original app (`/legacy`) saves locally only
+- **Exercise cache** — Hevy exercise list pulled and cached at setup, used throughout for slot configuration and the exercise picker
 
 ---
 
@@ -77,9 +77,9 @@ Full schema in [`docs/schema.md`](docs/schema.md).
 | `main.py` | FastAPI app, all API routes |
 | `database.py` | Schema definitions, `init_db()`, migrations |
 | `wave_math.py` | e1RM calculation, Joker band filter, BBB weight logic |
-| `hevy_client.py` | Hevy API HTTP client — exercise cache pull, workout write-back |
+| `hevy_client.py` | Hevy API HTTP client — exercise cache pull, recent workouts, exercise history, workout create |
 | `index.html` | Entire frontend — HTML, CSS, JS in one file |
-| `docker-compose.yml` | Deployment config — contains CasaOS metadata, do not alter |
+| `docker-compose.yml` | Deployment config |
 | `requirements.txt` | Must stay in sync with all imports in `.py` files |
 
 ---
@@ -87,7 +87,7 @@ Full schema in [`docs/schema.md`](docs/schema.md).
 ## Hevy integration
 
 - **Exercise list** — `GET /v1/exercise_templates` pulled at setup, stored in `hevy_exercise_cache`, refreshable via `POST /exercises/sync`
-- **Workout write-back** — `POST /v1/workouts` fired after session log is submitted; uses `exerciseTemplateId` from cache
+- **Workout create** — `POST /v1/workouts`, only from the `/log` page (`POST /hevy/workouts`); Hevy has no delete endpoint, so every success is permanent
 - **API key** — stored in `app_settings` table, never hardcoded or committed
 
 ---
@@ -100,7 +100,6 @@ Full schema in [`docs/schema.md`](docs/schema.md).
 | Frontend libraries | Chart.js only. No bundler, no build step. |
 | Frontend structure | `index.html` holds all HTML, CSS, JS. Do not split. |
 | DB path | Read from `os.environ` as `DB_PATH`. Never hardcode. |
-| Docker | Do not alter CasaOS metadata in `docker-compose.yml`. |
 | Commits | No `git commit` or `git push`. Brian commits after review. |
 | Deletions | No permanent deletions without explicit written instruction. |
 | Column names | Always verify with `PRAGMA table_info`. Never assume. |

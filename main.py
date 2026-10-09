@@ -1,15 +1,12 @@
 import json
-import logging
 from collections import defaultdict
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
 from typing import Any, Literal
 
 import httpx
 from cryptography.fernet import InvalidToken
 from fastapi import FastAPI, HTTPException, Query, Response
 from fastapi.responses import FileResponse, RedirectResponse
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
@@ -23,8 +20,6 @@ import refs_store
 from wave_math import bbb_weight, epley, joker_qualifies, joker_weight, round_weight, session_e1rm, working_weight
 from workout_payload import build_hevy_workout
 from workout_view import summarize_workout
-
-logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -561,16 +556,6 @@ def _wave_param_number(wave_params: dict[str, Any], keys: list[str]) -> float | 
     return None
 
 
-def _wave_param_int(wave_params: dict[str, Any], key: str) -> int | None:
-    value = wave_params.get(key)
-    if value is None:
-        return None
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return None
-
-
 def _slot_in_program(conn, slot_id: int, program_id: int) -> dict[str, Any] | None:
     row = conn.execute(
         """
@@ -583,19 +568,6 @@ def _slot_in_program(conn, slot_id: int, program_id: int) -> dict[str, Any] | No
         (slot_id, program_id),
     ).fetchone()
     return dict(row) if row is not None else None
-
-
-def _load_api_key(conn) -> str | None:
-    """Read and decrypt the Hevy API key using the existing DB connection."""
-    row = conn.execute(
-        "SELECT value FROM app_settings WHERE key = 'hevy_api_key'"
-    ).fetchone()
-    if row is None:
-        return None
-    try:
-        return hevy_client._decrypt(row["value"])
-    except Exception:
-        return None
 
 
 def _resolve_e1rm(conn, hevy_exercise_id: str) -> float | None:
@@ -1613,7 +1585,6 @@ def log_active_block_session(active_block_id: int, data: SessionLogInput):
     if not data.sets:
         raise HTTPException(status_code=422, detail="sets cannot be empty.")
 
-    inserted_row_ids: list[int] = []
     normalized_sets: list[dict[str, Any]] = []
     slot_meta: dict[int, dict[str, Any]] = {}
 
@@ -1638,7 +1609,7 @@ def log_active_block_session(active_block_id: int, data: SessionLogInput):
                 if item.actual_weight_kg is not None
                 else None
             )
-            cursor = conn.execute(
+            conn.execute(
                 """
                 INSERT INTO session_log (
                     active_block_id,
@@ -1669,7 +1640,6 @@ def log_active_block_session(active_block_id: int, data: SessionLogInput):
                     item.actual_rpe,
                 ),
             )
-            inserted_row_ids.append(cursor.lastrowid)
             normalized_sets.append(
                 {
                     "slot_id": item.slot_id,
@@ -1725,58 +1695,7 @@ def log_active_block_session(active_block_id: int, data: SessionLogInput):
                 (active_block_id, slot_id, float(round_weight(final_e1rm)), source),
             )
 
-    hevy_synced = False
-    try:
-        now = datetime.now(timezone.utc).isoformat()
-        grouped_for_payload: dict[int, list[dict[str, Any]]] = defaultdict(list)
-        for row in normalized_sets:
-            grouped_for_payload[row["slot_id"]].append(row)
-
-        payload_exercises = []
-        for slot_id, set_rows in grouped_for_payload.items():
-            meta = slot_meta.get(slot_id)
-            if meta is None:
-                continue
-            payload_sets = []
-            for row in sorted(set_rows, key=lambda x: x["set_number"]):
-                if row["reps"] is None:
-                    continue
-                payload_sets.append(
-                    {
-                        "type": row["set_type"],
-                        "weightKg": row["actual_weight_kg"],
-                        "reps": row["reps"],
-                    }
-                )
-            if payload_sets:
-                payload_exercises.append(
-                    {
-                        "exerciseTemplateId": meta["hevy_exercise_id"],
-                        "title": meta["hevy_exercise_name"],
-                        "sets": payload_sets,
-                    }
-                )
-
-        payload = {
-            "title": f"531 BBB-AR Cycle {state['current_cycle']} Day {state['current_day']}",
-            "startTime": now,
-            "endTime": now,
-            "exercises": payload_exercises,
-        }
-        hevy_workout_id = hevy_client.HevyClient().post_workout(payload)
-        if hevy_workout_id:
-            with get_db() as conn:
-                for row_id in inserted_row_ids:
-                    conn.execute(
-                        "UPDATE session_log SET hevy_workout_id = ? WHERE id = ?",
-                        (hevy_workout_id, row_id),
-                    )
-            hevy_synced = True
-    except Exception:
-        logger.exception("Hevy write-back failed during session logging.")
-        hevy_synced = False
-
-    return {"session_logged": True, "hevy_synced": hevy_synced}
+    return {"session_logged": True}
 
 
 @app.get("/active-blocks/{active_block_id}/e1rm")

@@ -101,9 +101,7 @@
     .theme-select,
     .field input,
     .field textarea,
-    .field select,
-    .inline-input,
-    .search-input {
+    .field select {
       border: 1px solid var(--border);
       border-radius: 8px;
       background: var(--bg-soft);
@@ -209,8 +207,6 @@
       font-size: 0.8rem;
     }
 
-    .hide { display: none !important; }
-
     .unit-toggle {
       margin-top: 0.66rem;
       border: 1px solid var(--border);
@@ -232,8 +228,6 @@
     .unit-toggle button:last-child { border-right: 0; }
     .unit-toggle button.active { color: var(--text); background: rgba(111, 211, 178, 0.18); }
 
-    .program-list { display: grid; gap: 0.5rem; }
-
     .program-row {
       border: 1px solid var(--border);
       border-radius: 9px;
@@ -246,8 +240,6 @@
       font-size: 0.84rem;
       cursor: pointer;
     }
-
-    .programs-screen { display: block; }
 
     .programs-layout {
       display: grid;
@@ -313,229 +305,6 @@
     }
     .autocomplete-item:hover, .autocomplete-item.ac-focused { background: var(--bg-soft); }
 
-    .program-toolbar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 0.6rem;
-      margin-bottom: 0.66rem;
-    }
-
-    .program-toolbar h2 {
-      margin: 0;
-      font-size: 1rem;
-    }
-
-    .program-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 0.55rem;
-      margin-bottom: 0.66rem;
-    }
-
-    .program-title-wrap {
-      flex: 1;
-      min-width: 0;
-      display: flex;
-      align-items: center;
-      gap: 0.44rem;
-    }
-
-    .inline-input {
-      width: 100%;
-      min-width: 140px;
-      border-color: transparent;
-      background: transparent;
-      font-size: 0.98rem;
-      font-weight: 700;
-      padding: 0.2rem 0.4rem;
-    }
-
-    .program-name-inline {
-      font-size: 1rem;
-      font-weight: 700;
-      border: 1px solid transparent;
-      border-radius: 8px;
-      padding: 0.28rem 0.45rem;
-    }
-
-    .program-name-inline:focus {
-      border-color: var(--border);
-      background: var(--bg-soft);
-      outline: none;
-    }
-
-    .micro-list {
-      display: grid;
-      gap: 0.45rem;
-      margin-top: 0.5rem;
-    }
-
-    .micro-row {
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      background: var(--bg-soft);
-      padding: 0.5rem 0.6rem;
-      display: grid;
-      grid-template-columns: 1fr auto auto;
-      gap: 0.45rem;
-      align-items: center;
-    }
-
-    .micro-open {
-      border: 0;
-      background: transparent;
-      color: var(--text);
-      text-align: left;
-      padding: 0;
-      cursor: pointer;
-      font-weight: 600;
-    }
-
-    .day-tabs {
-      display: flex;
-      gap: 0.4rem;
-      overflow-x: auto;
-      padding-bottom: 0.25rem;
-      margin: 0.6rem 0;
-    }
-
-    .day-tab {
-      border: 1px solid var(--border);
-      border-radius: 999px;
-      background: transparent;
-      color: var(--muted);
-      padding: 0.35rem 0.62rem;
-      white-space: nowrap;
-      cursor: pointer;
-    }
-
-    .day-tab.active {
-      color: var(--text);
-      border-color: rgba(111, 211, 178, 0.42);
-      background: rgba(111, 211, 178, 0.16);
-    }
-
-    .movement-panel {
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      background: var(--bg-soft);
-      padding: 0.7rem;
-      margin-top: 0.7rem;
-    }
-
-    .set-grid {
-      width: 100%;
-      border-collapse: collapse;
-      table-layout: fixed;
-      margin-top: 0.5rem;
-      font-size: 0.8rem;
-    }
-
-    .set-grid th,
-    .set-grid td {
-      border-bottom: 1px solid var(--border);
-      padding: 0.35rem;
-      text-align: left;
-    }
-
-    .set-grid th {
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.03em;
-      font-size: 0.7rem;
-      background: var(--bg-mute);
-    }
-
-    .set-grid tr:last-child td {
-      border-bottom: 0;
-    }
-
-    .set-grid input[type="number"] {
-      width: 100%;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      background: var(--bg-elev);
-      color: var(--text);
-      padding: 0.25rem 0.32rem;
-      font-size: 0.78rem;
-    }
-
-    .tm-badge {
-      border: 1px solid var(--border);
-      border-radius: 999px;
-      background: transparent;
-      color: var(--text);
-      padding: 0.2rem 0.5rem;
-      font-size: 0.74rem;
-      cursor: pointer;
-    }
-
-    .tm-badge.warn {
-      border-color: #c9972f;
-      background: rgba(201, 151, 47, 0.18);
-      color: #ffd98a;
-    }
-
-    .tm-input {
-      width: 92px;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      background: var(--bg-elev);
-      color: var(--text);
-      padding: 0.22rem 0.35rem;
-      font-size: 0.78rem;
-    }
-
-    .movement-actions {
-      display: flex;
-      gap: 0.35rem;
-      justify-content: flex-end;
-    }
-
-    .cycle-tabs {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.42rem;
-      margin-bottom: 0.6rem;
-    }
-
-    .cycle-tab {
-      border: 1px solid var(--border);
-      border-radius: 999px;
-      background: transparent;
-      color: var(--muted);
-      padding: 0.36rem 0.58rem;
-      font-size: 0.76rem;
-      cursor: pointer;
-    }
-
-    .cycle-tab.active {
-      color: var(--text);
-      border-color: rgba(111, 211, 178, 0.42);
-      background: rgba(111, 211, 178, 0.16);
-    }
-
-    .day-block {
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      background: var(--bg-soft);
-      margin-bottom: 0.66rem;
-      overflow: hidden;
-    }
-
-    .day-head {
-      border-bottom: 1px solid var(--border);
-      padding: 0.48rem 0.56rem;
-      background: var(--bg-mute);
-      font-size: 0.79rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 0.45rem;
-    }
-
     .sheet {
       width: 100%;
       border-collapse: collapse;
@@ -561,69 +330,6 @@
 
     .sheet tr:last-child td { border-bottom: 0; }
 
-    .movement-main { font-weight: 600; display: block; }
-    .movement-sub { color: var(--muted); display: block; font-size: 0.72rem; margin-top: 0.08rem; }
-
-    .drawer {
-      position: sticky;
-      top: 0.8rem;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      background: var(--bg-soft);
-      padding: 0.72rem;
-      display: none;
-      max-height: 84vh;
-      overflow: auto;
-    }
-
-    .drawer.open { display: block; }
-    .drawer h3 { margin: 0 0 0.46rem; font-size: 0.86rem; }
-
-    .search-results {
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      background: var(--bg-mute);
-      max-height: 160px;
-      overflow: auto;
-      margin-top: 0.34rem;
-    }
-
-    .search-item {
-      width: 100%;
-      border: 0;
-      border-bottom: 1px solid var(--border);
-      background: transparent;
-      color: var(--text);
-      padding: 0.35rem 0.45rem;
-      font-size: 0.79rem;
-      text-align: left;
-      cursor: pointer;
-    }
-
-    .search-item:last-child { border-bottom: 0; }
-
-    .workout-top {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 0.55rem;
-      flex-wrap: wrap;
-      margin-bottom: 0.66rem;
-    }
-
-    .session-table input {
-      width: 100%;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      background: var(--bg-elev);
-      color: var(--text);
-      padding: 0.26rem 0.32rem;
-      font-size: 0.76rem;
-    }
-
-    .row-done { opacity: 0.66; }
-    .row-pending { opacity: 0.84; }
-
     .fallback {
       border: 1px dashed var(--border);
       border-radius: 10px;
@@ -631,30 +337,6 @@
       color: var(--muted);
       font-size: 0.82rem;
       padding: 0.75rem;
-    }
-
-    .mobile-modal {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.52);
-      display: none;
-      z-index: 50;
-      align-items: center;
-      justify-content: center;
-      padding: 0.65rem;
-    }
-
-    .mobile-modal.open { display: flex; }
-
-    .mobile-modal .drawer {
-      display: block;
-      position: static;
-      width: min(470px, 100%);
-      max-height: 92vh;
-    }
-
-    @media (max-width: 920px) {
-      .movement-actions { justify-content: flex-start; }
     }
 
     @media (max-width: 680px) {
@@ -671,7 +353,6 @@
       }
       .sheet { font-size: 0.75rem; }
       .sheet th, .sheet td { padding: 0.3rem 0.32rem; }
-      .micro-row { grid-template-columns: 1fr auto; }
     }
 
     /* ── Workout tab ─────────────────────────────────────── */
@@ -703,52 +384,6 @@
       margin: 0.65rem;
       overflow: hidden;
     }
-    .wo-slot-head {
-      padding: 0.5rem 0.7rem;
-      font-weight: 700;
-      font-size: 0.88rem;
-      background: var(--bg-mute);
-      border-bottom: 1px solid var(--border);
-    }
-    .wo-sets-table {
-      width: 100%;
-      border-collapse: collapse;
-      table-layout: fixed;
-      font-size: 0.8rem;
-    }
-    .wo-sets-table th {
-      font-size: 0.73rem;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.03em;
-      background: var(--bg-mute);
-      padding: 5px 8px;
-      text-align: center;
-      border-bottom: 1px solid var(--border);
-    }
-    .wo-sets-table th:first-child { text-align: left; }
-    .wo-sets-table th:nth-child(2) { text-align: left; }
-    .wo-sets-table td {
-      padding: 5px 8px;
-      vertical-align: middle;
-      border-bottom: 1px solid var(--border);
-    }
-    .wo-sets-table tr:last-child td { border-bottom: 0; }
-    .wo-sets-table tr.amrap-row { background: var(--bg-mute); }
-    .wo-sets-table input[type=number] {
-      -moz-appearance: textfield;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      background: var(--bg-elev);
-      color: var(--text);
-      padding: 0.26rem 0.32rem;
-      font-size: 0.78rem;
-      min-width: 48px;
-    }
-    .wo-sets-table input[type=number]::-webkit-inner-spin-button,
-    .wo-sets-table input[type=number]::-webkit-outer-spin-button { display: none; }
-    .wo-joker-row { color: var(--muted); }
-    .wo-dimmed { opacity: 0.4; }
     .wo-summary-table {
       width: 100%;
       border-collapse: collapse;
@@ -867,7 +502,6 @@
   </div>
 
   <script>
-    const KG_TO_LBS = 2.2046;
     const STORAGE_KEYS = { theme: "531-theme", unitPref: "unit_pref", activeBlockId: "active_block_id" };
 
     const state = {
@@ -913,50 +547,6 @@
       if (!el) return;
       el.textContent = message || "";
       el.className = `status${tone ? ` ${tone}` : ""}`;
-    }
-
-    function roundToStep(value, step) {
-      if (!Number.isFinite(value)) return null;
-      return Math.round(value / step) * step;
-    }
-
-    function kgToLbs(kg) {
-      if (!Number.isFinite(kg)) return null;
-      return kg * KG_TO_LBS;
-    }
-
-    function lbsToKg(lbs) {
-      if (!Number.isFinite(lbs)) return null;
-      return lbs / KG_TO_LBS;
-    }
-
-    function normalizeKgDisplay(valueKg) {
-      return roundToStep(valueKg, 2.5);
-    }
-
-    function normalizeLbsDisplay(valueLbs) {
-      return roundToStep(valueLbs, 5);
-    }
-
-    function normalizeConverted(value) {
-      return roundToStep(value, 0.5);
-    }
-
-    function formatNumber(value) {
-      if (!Number.isFinite(value)) return "--";
-      return Number(value).toFixed(value % 1 === 0 ? 0 : 1);
-    }
-
-    function formatWeightDualFromKg(inputKg) {
-      if (!Number.isFinite(inputKg)) return "";
-      const kg = normalizeKgDisplay(inputKg);
-      const lbs = normalizeConverted(kgToLbs(kg));
-      const kgSecondary = normalizeConverted(lbsToKg(lbs));
-
-      if (state.unitPref === "lbs") {
-        return `${formatNumber(lbs)}lbs (${formatNumber(kgSecondary)}kg)`;
-      }
-      return `${formatNumber(kg)}kg (${formatNumber(lbs)}lbs)`;
     }
 
     function applyUnitPreference(pref) {
@@ -1559,43 +1149,6 @@ Lying Leg Curl - 5x10</pre>
       }
     }
 
-    function formatLoading(slot) {
-      const rawWave = slot?.wave_params;
-      if (rawWave == null) return "—";
-
-      let wave;
-      if (typeof rawWave === "string") {
-        try {
-          wave = JSON.parse(rawWave);
-        } catch (_error) {
-          return "—";
-        }
-      } else if (typeof rawWave === "object") {
-        wave = rawWave;
-      } else {
-        return "—";
-      }
-
-      const rows = Array.isArray(wave?.sets) ? wave.sets : null;
-      if (!rows || !rows.length) return "—";
-
-      const loading = rows.map((setRow) => {
-        const reps = Number(setRow?.reps);
-        if (!Number.isFinite(reps) || reps <= 0) return null;
-
-        if (setRow?.is_joker) {
-          return `${reps}J`;
-        }
-
-        const rpe = Number(setRow?.target_rpe);
-        if (!Number.isFinite(rpe)) return null;
-
-        return setRow?.is_amrap ? `${reps}+@${rpe}` : `${reps}@${rpe}`;
-      });
-
-      return loading.every(Boolean) ? loading.join(" / ") : "—";
-    }
-
 
 
     // ── Workout tab ──────────────────────────────────────────────────────────────
@@ -1615,13 +1168,6 @@ Lying Leg Curl - 5x10</pre>
     function woKgToLbs(kg)  { return Math.round(kg * 2.2046 * 2) / 2; }
     function woRound25(kg)  { return Math.round(kg / 2.5) * 2.5; }
     function woUnitPref()   { return localStorage.getItem('unitPref') || 'kg'; }
-
-    function woFormatLoad(kg, pref) {
-      if (!Number.isFinite(kg)) return '—';
-      const kgR = woRound25(kg);
-      const lbs = woKgToLbs(kgR);
-      return pref === 'lbs' ? `${lbs}lbs (${kgR}kg)` : `${kgR}kg (${lbs}lbs)`;
-    }
 
     function woComputeE1rm(weightKg, reps) {
       if (!Number.isFinite(weightKg) || !Number.isFinite(reps) || reps < 1) return null;

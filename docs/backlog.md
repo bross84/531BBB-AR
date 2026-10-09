@@ -26,8 +26,6 @@ The gym is the garage on the home network, so none of this blocks use there.
 
 ## Tidy-ups
 
-- **The old Hevy write-back in `main.py`** (`log_active_block_session` -> `hevy_client.post_workout`) sends the wrong request format and mis-reads Hevy's reply. The new log page does not use it. Remove or fix it. See `docs/hevy-api.md`.
-- **The unused `HEVY_API_KEY` variable** in `docker-compose.yml` and its CasaOS entry. Nothing reads it (the key is stored encrypted in the database).
 - **Rename the project** (still 531 BBB-AR in the name, docs, container and database file) once the direction settles.
 - **Parked design work:** `docs/notation-spec.md` (program notation, TM/e1RM rules). Not being built now.
 
@@ -35,4 +33,6 @@ The gym is the garage on the home network, so none of this blocks use there.
 
 - Recent workouts page, workout entry page, own RPE table, per-movement auto weight, kg conversion, picker with recent first, current e1RM from today's best set (2026-10-08).
 - Tests run on GitHub for every push and pull request.
+- Removed the old Hevy write-back from the legacy session route and `HevyClient.post_workout` (2026-10-08).
+- Removed the unused `HEVY_API_KEY` variable and its CasaOS entry from `docker-compose.yml` (2026-10-08).
 - Posts to Hevy as the nearest half kilo (198 lb -> 90 kg); an RPE Hevy can't store is left blank.
