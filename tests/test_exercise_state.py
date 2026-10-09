@@ -63,9 +63,14 @@ class TestSessions(unittest.TestCase):
 
 class TestReferenceSet(unittest.TestCase):
 
-    def test_heaviest_working_set_with_an_rpe(self):
+    def test_the_set_with_the_highest_e1rm(self):
         ref = reference_set(sessions_newest_first(SQUAT)[0], pct)
         self.assertEqual((292, 5, 8.0), (ref["weight_lb"], ref["reps"], ref["rpe"]))
+
+    def test_a_lighter_set_wins_when_its_e1rm_is_higher(self):
+        # 292 x 3 @8 is the heaviest set (e1RM 332) but 265 x 5 @6 prices higher (343).
+        ref = reference_set(sessions_newest_first(SQUAT)[1], pct)
+        self.assertEqual((265, 5, 6.0), (ref["weight_lb"], ref["reps"], ref["rpe"]))
 
     def test_warmups_and_sets_without_rpe_are_ignored(self):
         session = [S("w", "2026-01-01T00:00:00+00:00", "warmup", 300, 5, 8),
@@ -73,10 +78,10 @@ class TestReferenceSet(unittest.TestCase):
                    S("w", "2026-01-01T00:00:00+00:00", "normal", 200, 5, 7)]
         self.assertEqual(200, reference_set(session, pct)["weight_lb"])
 
-    def test_a_tie_on_weight_goes_to_the_later_set(self):
-        session = [S("w", "2026-01-01T00:00:00+00:00", "normal", 200, 5, 6),
-                   S("w", "2026-01-01T00:00:00+00:00", "normal", 200, 5, 8)]
-        self.assertEqual(8.0, reference_set(session, pct)["rpe"])
+    def test_a_tie_on_e1rm_goes_to_the_later_set(self):
+        session = [S("w", "2026-01-01T00:00:00+00:00", "normal", 200, 5, 7),
+                   S("w", "2026-01-01T00:00:00+00:00", "failure", 200, 5, 7)]
+        self.assertEqual("failure", reference_set(session, pct)["entry"]["set_type"])
 
     def test_a_set_the_table_cannot_price_is_skipped(self):
         session = [S("w", "2026-01-01T00:00:00+00:00", "normal", 300, 28, 5),
@@ -95,6 +100,11 @@ class TestBuildExerciseState(unittest.TestCase):
         self.assertEqual("BS-Bridge1.3.1", state["workout_title"])
         self.assertEqual((292, 5, 8.0), (state["set_weight_lb"], state["set_reps"], state["set_rpe"]))
         self.assertEqual(round(292 / 0.826, 1), state["e1rm_lb"])
+
+    def test_reports_the_best_set_not_the_heaviest(self):
+        state = build_exercise_state([s for s in SQUAT if s["workout_id"] == "w2"], pct)
+        self.assertEqual((265, 5, 6.0), (state["set_weight_lb"], state["set_reps"], state["set_rpe"]))
+        self.assertEqual(round(265 / 0.773, 1), state["e1rm_lb"])
 
     def test_falls_back_to_an_older_session_when_the_newest_has_no_rpe_sets(self):
         newest = [S("w9", "2026-10-07T00:00:00+00:00", "normal", 100, 10, None, "Accessory day")]
