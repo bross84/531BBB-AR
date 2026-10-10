@@ -8,7 +8,6 @@ These belong together: the e1RM and the TM are **two numbers with two jobs**, an
 
 - **TM comes only from a set you mark (the `TS`).** A button on each set row. Tapping it makes that set the one that sets the movement's TM (only one per movement; tapping another moves it). TM = that set's e1RM x the TM percentage (default 95%, changeable). The TM is a **stored value** (movement, TS e1RM, TM %, date set) kept in this app's database, because it stays fixed until you mark a new TS (day 3's top set sets next week's TM). Hevy has no field for it. Until a TS is marked, the TM tile says so; it does not guess. *(Decided 2026-10-08. Still to confirm: the TM stays fixed until a new TS is marked, rather than updating after every session.)*
 - **Parked: keep noisy sets out of the e1RM.** The e1RM is the highest e1RM across the sets, so one inflated set wins (the RPE table has to guess the reps left on a low-RPE set, e.g. an 8 @5 gives about 13 reps to failure). Decided 2026-10-08 to leave it until the e1RM is used to load weights; once the TS sets the TM it is only a metric. Preferred rule when it comes back: a set counts only if its RPE is 7 or higher (one constant in `exercise_state.py` and `log.html`; the last-set feature stays exempt). On the 19 Sep squat session that gives 332 (292 x 3 @8) instead of 343 (265 x 5 @6), the more trustworthy figure. Rejected: a rep cap (it would drop a real 9 @9.5 AMRAP) and a set-to-set window (it needs peer sets, so it can't judge a lone set, and a ramping session can mislead it). Bring it back if the e1RM tile looks too high.
-- **Auto weight step per movement.** Planned weights snap to the nearest 2.5 kg, which is too coarse for micro-loaded lifts like weighted pull-ups (0.5 kg steps). Only matters if you want RPE-driven weights on those movements.
 - **Keep our own record of sets.** Hevy cannot store RPE below 6 or 6.5 (it is simply left blank when posting). A local log would keep every RPE as a number so history can use it.
 
 ## Nice to have
@@ -32,6 +31,7 @@ The gym is the garage on the home network, so none of this blocks use there.
 
 - Recent workouts page, workout entry page, own RPE table, per-movement auto weight, kg conversion, picker with recent first, current e1RM from today's best set (2026-10-08).
 - The e1RM from the last session now uses the best set (highest e1RM), not the heaviest; today's best set already did (2026-10-08).
+- Rounding step per movement: `step_kg` is stored per movement (default 2.5 kg) and planned weights round to it, so micro-loaded lifts like weighted pull-ups can use 0.5 kg (2026-10-08).
 - Tests run on GitHub for every push and pull request.
 - Removed the old Hevy write-back from the legacy session route and `HevyClient.post_workout` (2026-10-08).
 - Removed the unused `HEVY_API_KEY` variable and its CasaOS entry from `docker-compose.yml` (2026-10-08).
