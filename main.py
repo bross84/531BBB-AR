@@ -7,6 +7,7 @@ import httpx
 from cryptography.fernet import InvalidToken
 from fastapi import FastAPI, HTTPException, Query, Response
 from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
@@ -48,6 +49,15 @@ def index():
 @app.get("/legacy")
 def legacy_index():
     return FileResponse("index.html", headers=NO_CACHE)
+
+
+# Lets a phone or tablet add the pages to its home screen and open them like an app.
+@app.get("/manifest.webmanifest")
+def web_app_manifest():
+    return FileResponse("static/manifest.webmanifest", media_type="application/manifest+json", headers=NO_CACHE)
+
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 # ── Recent workouts (read from Hevy) ───────────────────────────────────────────

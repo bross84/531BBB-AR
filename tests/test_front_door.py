@@ -1,4 +1,5 @@
 """The front door: / sends you to the workout log; the original app is kept, unchanged, at /legacy."""
+import json
 import os
 import shutil
 import sys
@@ -45,6 +46,30 @@ class TestFrontDoor(unittest.TestCase):
         for path in ("/log", "/recent", "/legacy"):
             self.assertEqual("no-cache", self.client.get(path).headers["cache-control"], path)
         self.assertEqual("no-cache", self.client.get("/", follow_redirects=False).headers["cache-control"])
+
+    # The pages can be added to a phone or tablet home screen and open like an app.
+    def test_manifest_is_served_and_starts_on_the_log_page(self):
+        r = self.client.get("/manifest.webmanifest")
+        self.assertEqual(200, r.status_code)
+        self.assertIn("manifest+json", r.headers["content-type"])
+        manifest = json.loads(r.text)
+        self.assertEqual(("/log", "standalone"), (manifest["start_url"], manifest["display"]))
+
+    def test_every_icon_in_the_manifest_is_served_as_a_png(self):
+        icons = json.loads(self.client.get("/manifest.webmanifest").text)["icons"]
+        self.assertTrue({"192x192", "512x512"} <= {i["sizes"] for i in icons})
+        for icon in icons:
+            r = self.client.get(icon["src"])
+            self.assertEqual(200, r.status_code, icon["src"])
+            self.assertEqual("image/png", r.headers["content-type"])
+            self.assertTrue(r.content.startswith(b"\x89PNG"), icon["src"])
+
+    def test_the_pages_point_at_the_manifest_and_the_touch_icon(self):
+        for path in ("/log", "/recent"):
+            html = self.client.get(path).text
+            self.assertIn('rel="manifest" href="/manifest.webmanifest"', html, path)
+            self.assertIn('rel="apple-touch-icon" href="/static/apple-touch-icon.png"', html, path)
+        self.assertEqual(200, self.client.get("/static/apple-touch-icon.png").status_code)
 
 
 if __name__ == "__main__":
