@@ -45,6 +45,7 @@
     .set.done { background: var(--done); border-color: var(--done-line); }
     .set input, .set select { width: 100%; text-align: center; padding: 6px 2px; }
     .set .kind { padding: 0; font-size: 14px; color: var(--muted); }
+    .set .kind.ts { color: var(--accent); font-weight: 500; }
     .wcell { position: relative; min-width: 0; }
     .wcell .kg { position: absolute; left: 0; right: 0; top: 100%; margin-top: 1px; text-align: center; font-size: 11px; line-height: 1; color: var(--muted); pointer-events: none; }
     .set .tick { padding: 0; font-size: 20px; }
@@ -129,7 +130,15 @@
 <script>
   const RPES = [4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10];
   const KIND = { normal: "", warmup: "W", failure: "F", dropset: "D" };
-  const NEXT_KIND = { normal: "warmup", warmup: "failure", failure: "dropset", dropset: "normal" };
+  // The toggle in front of each set cycles through these. "ts" is a normal set that also sets the movement's TM
+  // once the workout is saved; only one set per movement can be the TS.
+  const KIND_ORDER = ["normal", "warmup", "ts", "failure", "dropset"];
+  function kindOf(s) { return s.type === "normal" && s.ts ? "ts" : s.type; }
+  function setKind(ex, s, kind) {
+    s.ts = kind === "ts";
+    s.type = kind === "ts" ? "normal" : kind;
+    if (s.ts) ex.sets.forEach((other) => { if (other !== s) other.ts = false; });
+  }
   const KEY = "logDraft";
   const $ = (id) => document.getElementById(id);
   let draft = null, recentPage = null, catalog = null, saving = false;
@@ -184,11 +193,11 @@
     return v > 0 ? trim(Math.round(v / LB_PER_KG * 2) / 2) + " kg" : "";
   }
   function showKg(s) { const label = kgLabels.get(s); if (label) label.textContent = kgText(s.lb); }
-  function defaultRef() { return { basis: "e1rm", ls: true, tmPct: 0.95, stepKg: 2.5, state: null }; }
+  function defaultRef() { return { basis: "e1rm", ls: true, tmPct: 0.95, stepKg: 2.5, state: null, ts: null }; }
   function refFromServer(id) {
     const r = refs[id];
     if (!r) return defaultRef();
-    return { basis: r.basis, ls: r.ls, tmPct: r.tm_pct, stepKg: r.step_kg || 2.5, state: null };
+    return { basis: r.basis, ls: r.ls, tmPct: r.tm_pct, stepKg: r.step_kg || 2.5, state: null, ts: null };
   }
 
   // The e1RM of the nearest earlier set that is ticked done and has weight, reps and an RPE.
@@ -251,13 +260,47 @@
     note.textContent = refNote(ex);
   }
 
+  // The movement's TM: the latest saved TS's e1RM x the TM %. Until a TS has been saved it falls back to the
+  // best set of the last session, so a movement keeps its weights while you have no TS yet.
+  function tmValue(ex) {
+    const ts = ex.ref.ts, st = ex.ref.state;
+    if (ts && ts.found) return ts.e1rm_lb * ex.ref.tmPct;
+    return st && st.found ? st.e1rm_lb * ex.ref.tmPct : null;
+  }
+
+  function daysAgo(iso) {
+    const d = Math.floor((Date.now() - new Date(iso)) / 86400000);
+    return d <= 0 ? "today" : d === 1 ? "yesterday" : d + " days ago";
+  }
+
+  // The set in this workout marked as the TS, with its working-set number, or null.
+  function markedTs(ex) {
+    let working = 0;
+    for (const s of ex.sets) {
+      if (s.type !== "warmup") working += 1;
+      if (s.ts) return { set: s, n: working };
+    }
+    return null;
+  }
+
+  function tmNote(ex) {
+    const ts = ex.ref.ts;
+    let note;
+    if (!ts) note = "Checking for your TS…";
+    else if (ts.found) note = "TM from your TS: " + trim(ts.weight_lb) + " lb × " + ts.reps + " @" + ts.rpe + ", " + fmtShortDate(ts.set_at) + " (" + daysAgo(ts.set_at) + ").";
+    else note = "No TS yet, so the TM is your last session's best set. Tap a set's number until it shows TS to mark one.";
+    const marked = markedTs(ex);
+    if (marked) note += " TS marked on set " + marked.n + ": it becomes your TM when you save.";
+    return note;
+  }
+
   function baseFor(ex, index) {
     if (ex.ref.ls) {
       const v = lastSetE1rm(ex, index);
       if (v) return v;
     }
     const st = ex.ref.state;
-    if (ex.ref.basis === "tm") return st && st.found ? st.e1rm_lb * ex.ref.tmPct : null;
+    if (ex.ref.basis === "tm") return tmValue(ex);
     const cur = currentE1rm(ex);
     return cur ? cur.value : null;
   }
@@ -292,7 +335,17 @@
     cardEls.set(ex.id, fresh);
   }
 
+  async function loadTs(ex) {
+    try {
+      ex.ref.ts = await api("/training-max/" + encodeURIComponent(ex.template_id));
+    } catch (err) {
+      ex.ref.ts = { found: false };
+    }
+    applyAuto(ex); saveDraft(); refreshCard(ex);
+  }
+
   async function loadState(ex) {
+    loadTs(ex);
     try {
       ex.ref.state = await api("/hevy/exercise-state/" + encodeURIComponent(ex.template_id));
     } catch (err) {
@@ -402,7 +455,7 @@
 
   function renderRefBar(ex) {
     const wrap = el("div", "refbar");
-    const st = ex.ref.state, found = !!(st && st.found);
+    const st = ex.ref.state;
     const show = (v) => (v != null ? String(v) : !st ? "…" : "–");
 
     const tiles = el("div", "tiles");
@@ -430,12 +483,14 @@
     pct.value = trim(ex.ref.tmPct * 100); pct.setAttribute("aria-label", "TM as a percentage of e1RM");
     pct.addEventListener("click", (e) => e.stopPropagation());
     tmLabel.append(pct, "%");
-    const tmTile = tile("tm", tmLabel, show(found ? Math.round(st.e1rm_lb * ex.ref.tmPct) : null));
+    const tmv = tmValue(ex);
+    const tmTile = tile("tm", tmLabel, show(tmv != null ? Math.round(tmv) : null));
     pct.addEventListener("input", () => {
       const v = Number(pct.value) / 100;
       if (!(v >= 0.5 && v <= 1)) return;
       ex.ref.tmPct = v; applyAuto(ex); saveDraft(); saveRef(ex);
-      if (found) tmTile.querySelector(".tv").textContent = String(Math.round(st.e1rm_lb * v));
+      const now = tmValue(ex);
+      if (now != null) tmTile.querySelector(".tv").textContent = String(Math.round(now));
     });
     tiles.append(tmTile);
 
@@ -447,6 +502,7 @@
     wrap.append(tiles);
 
     wrap.append(el("p", "hint refnote", refNote(ex)));
+    wrap.append(el("p", "hint tmnote", tmNote(ex)));
 
     const stepLine = el("label", "hint stepline", "Round weights to ");
     const step = el("select");
@@ -476,9 +532,15 @@
     ex.sets.forEach((s) => {
       if (s.type !== "warmup") working += 1;
       const row = el("div", "set" + (s.done ? " done" : ""));
-      const kind = el("button", "kind", s.type === "normal" ? String(working) : KIND[s.type]);
-      kind.type = "button"; kind.setAttribute("aria-label", "Set type: " + s.type);
-      kind.addEventListener("click", () => { s.type = NEXT_KIND[s.type]; saveDraft(); renderWorkout(); });
+      const k = kindOf(s);
+      const kind = el("button", "kind" + (k === "ts" ? " ts" : ""), k === "normal" ? String(working) : k === "ts" ? "TS" : KIND[s.type]);
+      kind.type = "button";
+      kind.setAttribute("aria-label", "Set type: " + (k === "ts" ? "TS, sets your TM when you save" : s.type));
+      kind.title = "Tap to change: set, warm-up, TS (sets your TM), failure, drop set";
+      kind.addEventListener("click", () => {
+        setKind(ex, s, KIND_ORDER[(KIND_ORDER.indexOf(k) + 1) % KIND_ORDER.length]);
+        saveDraft(); renderWorkout();
+      });
 
       const lb = el("input"); lb.type = "text"; lb.inputMode = "decimal"; lb.value = s.lb; lb.setAttribute("aria-label", "Weight in pounds");
       const kgLabel = el("span", "kg"), wcell = el("div", "wcell");
@@ -669,14 +731,18 @@
     for (const ex of draft.exercises) {
       const sets = [];
       for (const [i, s] of ex.sets.entries()) {
-        if (!s.done) continue;
         const where = ex.title + " (row " + (i + 1) + ")";
+        if (!s.done) {
+          if (s.ts) throw new Error(where + ": tick ✓ on your TS set, or tap its number until the TS is gone.");
+          continue;
+        }
         const reps = s.reps.trim() === "" ? NaN : Number(s.reps);
         if (!Number.isInteger(reps) || reps < 0) throw new Error(where + ": enter the reps you did.");
         const lb = s.lb.trim() === "" ? null : Number(s.lb);
         if (lb !== null && (isNaN(lb) || lb < 0)) throw new Error(where + ": the weight isn't a number.");
         const logged = s.arpe || s.rpe;
-        sets.push({ type: s.type, weight_lb: lb, reps, rpe: !logged ? null : Number(logged) });
+        if (s.ts && !(lb > 0 && reps > 0 && logged)) throw new Error(where + ": the TS set needs a weight, reps and an RPE.");
+        sets.push({ type: s.type, weight_lb: lb, reps, rpe: !logged ? null : Number(logged), ...(s.ts ? { ts: true } : {}) });
       }
       if (sets.length) exercises.push({ exercise_template_id: ex.template_id, title: ex.title, notes: ex.notes, sets });
     }
@@ -707,11 +773,11 @@
     if (draft && Array.isArray(draft.exercises)) {
       for (const ex of draft.exercises) {
         const old = ex.ref || {};
-        ex.ref = { basis: old.basis || "e1rm", ls: old.ls === undefined ? true : old.ls, tmPct: old.tmPct || 0.95, stepKg: old.stepKg || 2.5, state: old.state || null };
+        ex.ref = { basis: old.basis || "e1rm", ls: old.ls === undefined ? true : old.ls, tmPct: old.tmPct || 0.95, stepKg: old.stepKg || 2.5, state: old.state || null, ts: old.ts || null };
         for (const s of ex.sets) if (s.manual === undefined) s.manual = false;
       }
       renderWorkout();
-      draft.exercises.filter((ex) => !ex.ref.state).forEach(loadState);
+      draft.exercises.forEach((ex) => (ex.ref.state ? loadTs(ex) : loadState(ex)));
     } else { draft = null; renderStart(); }
   });
 </script>
