@@ -17,6 +17,7 @@ import hevy_client
 import exercise_state
 import program_parser
 import refs_store
+import training_max
 from wave_math import bbb_weight, epley, joker_qualifies, joker_weight, round_weight, session_e1rm, working_weight
 from workout_payload import build_hevy_workout
 from workout_view import summarize_workout
@@ -141,6 +142,7 @@ class EntrySet(BaseModel):
     weight_lb: float | None = Field(default=None, ge=0)
     reps: int | None = Field(default=None, ge=0)
     rpe: float | None = Field(default=None, ge=0, le=10)
+    ts: bool = False  # the set that sets this movement's TM; only takes effect once the workout is saved
 
 
 class EntryExercise(BaseModel):
@@ -160,6 +162,15 @@ class WorkoutEntry(BaseModel):
 
 class SavedWorkout(BaseModel):
     id: str | None = None
+
+
+class TrainingMax(BaseModel):
+    found: bool
+    e1rm_lb: float | None = None
+    weight_lb: float | None = None
+    reps: int | None = None
+    rpe: float | None = None
+    set_at: str | None = None
 
 
 class RpeTable(BaseModel):
@@ -217,15 +228,23 @@ def get_exercise_state(exercise_template_id: str):
     return exercise_state.build_exercise_state(entries, get_rpe_percentage)
 
 
+@app.get("/training-max/{exercise_template_id}", response_model=TrainingMax)
+def get_training_max(exercise_template_id: str):
+    """The movement's current TS: the set marked when its newest TS workout was saved."""
+    return training_max.latest(exercise_template_id)
+
+
 @app.post("/hevy/workouts", response_model=SavedWorkout)
 def create_hevy_workout(entry: WorkoutEntry):
     """Save a logged workout (weights in lb) to Hevy. Hevy has no delete endpoint, so each call
     that succeeds creates a real workout in the account."""
     try:
         body = build_hevy_workout(entry.model_dump())
+        ts_rows = training_max.ts_rows_from_entry(entry.model_dump(), get_rpe_percentage)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     created = _call_hevy(lambda client: client.create_workout(body))
+    training_max.record(ts_rows, entry.start_time)  # only once Hevy has the workout
     return {"id": created.get("id")}
 
 

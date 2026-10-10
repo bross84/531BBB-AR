@@ -128,6 +128,17 @@ def init_db() -> None:
                 PRIMARY KEY (rpe, reps)
             );
 
+            CREATE TABLE IF NOT EXISTS training_max_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                exercise_template_id TEXT NOT NULL,
+                e1rm_lb REAL NOT NULL,
+                weight_lb REAL NOT NULL,
+                reps INTEGER NOT NULL,
+                rpe REAL NOT NULL,
+                set_at TEXT NOT NULL,
+                recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+
             CREATE TABLE IF NOT EXISTS exercise_refs (
                 exercise_template_id TEXT PRIMARY KEY,
                 e1rm_lb REAL,
