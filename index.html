@@ -1877,6 +1877,7 @@ Lying Leg Curl - 5x10</pre>
       loadTheme();
       loadUnitPreference();
       initEvents();
+      if (location.hash === "#settings") activateTab("settings");
       await loadSettings();
       await loadExerciseCache();
       await loadPrograms();
