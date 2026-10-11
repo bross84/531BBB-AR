@@ -70,7 +70,7 @@
     .set .rpebtn { width: 100%; padding: 6px 2px; text-align: center; }
     .set .rpebtn.actual { border-color: var(--accent); color: var(--accent); }
     .scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, .45); z-index: 10; display: flex; align-items: flex-end; justify-content: center; }
-    .sheet { background: var(--card); border-radius: 16px 16px 0 0; padding: 14px 14px calc(14px + env(safe-area-inset-bottom)); width: 100%; max-width: 520px; }
+    .sheet { background: var(--card); border-radius: 16px 16px 0 0; padding: 14px 14px calc(14px + env(safe-area-inset-bottom)); width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto; }
     .sheet h2 { font-size: 17px; font-weight: 500; margin: 0 0 2px; }
     .sheetgrid { display: grid; gap: 8px; margin: 12px 0 4px; }
     .sheetgrid button { min-height: 52px; padding: 0; font-size: 18px; font-variant-numeric: tabular-nums; }
@@ -92,6 +92,17 @@
     .bar > div { max-width: 560px; margin: 0 auto; }
     .overlay { position: fixed; inset: 0; background: var(--bg); z-index: 5; overflow-y: auto; padding: 12px; }
     .overlay > div { max-width: 560px; margin: 0 auto; }
+    /* Wide screens (a tablet on its side): each exercise is one band, the e1RM, TM and buttons on the left and the
+       sets on the right, so a whole exercise fits on screen without scrolling. */
+    @media (min-width: 900px) {
+      main { max-width: 1000px; }
+      #exercises .card { display: grid; grid-template-columns: 340px minmax(0, 1fr); column-gap: 16px; align-items: start; }
+      #addEx { display: block; max-width: 560px; margin: 12px auto 0; }
+      #recent { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+      #recent .pick { margin: 0; }
+      .bar > div, .overlay > div { max-width: 1000px; }
+      .grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+    }
     [hidden] { display: none !important; }
   </style>
 </head>
@@ -576,12 +587,14 @@
 
   function renderExercise(ex) {
     const card = el("section", "card");
-    card.append(el("p", "ex-title", ex.title));
-    if (ex.last) card.append(el("p", "last", ex.last));
-    card.append(renderRefBar(ex));
+    const left = el("div", "exleft"), right = el("div", "exright");   // side by side on a wide screen, stacked otherwise
+    card.append(left, right);
+    left.append(el("p", "ex-title", ex.title));
+    if (ex.last) left.append(el("p", "last", ex.last));
+    left.append(renderRefBar(ex));
     const cols = el("div", "cols");
     for (const t of ["", "lb", "reps", "RPE", ""]) cols.append(el("span", null, t));
-    card.append(cols);
+    right.append(cols);
 
     let working = 0;
     ex.sets.forEach((s) => {
@@ -638,7 +651,7 @@
       });
 
       row.append(kind, wcell, reps, rpe, tick);
-      card.append(row);
+      right.append(row);
     });
 
     const actions = el("div", "row");
@@ -658,7 +671,7 @@
       draft.exercises = draft.exercises.filter((e) => e.id !== ex.id); saveDraft(); renderWorkout();
     });
     actions.append(add, del, rm);
-    card.append(actions);
+    left.append(actions);
     return card;
   }
 
