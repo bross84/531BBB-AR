@@ -82,8 +82,10 @@
     .tile .pctin { width: 34px; min-height: 0; height: 20px; padding: 0 2px; font-size: 11px; text-align: center; border-radius: 6px; background: var(--bg); }
     .pill { align-self: stretch; display: flex; align-items: center; justify-content: center; padding: 4px 8px; min-height: 36px; border-radius: 10px; font-size: 12px; color: var(--muted); }
     .pill.on { color: var(--accent); border-color: var(--accent); }
-    .set .rpebtn { width: 100%; min-height: 26px; height: 26px; background: var(--chip); border-radius: 8px; text-align: center; font-size: 13px; color: var(--muted); }
-    .set .rpebtn.actual { color: var(--accent); font-weight: 500; }
+    /* the RPE box is the same box as the weight and reps boxes */
+    .set .rpebtn { width: 100%; height: 34px; min-height: 34px; background: var(--chip); border-radius: 8px; text-align: center; font-size: 16px; font-weight: 500; color: var(--text); }
+    .set .rpebtn.none { color: var(--muted); font-weight: 400; }
+    .set.done .rpebtn { background: transparent; }
     .scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, .45); z-index: 10; display: flex; align-items: flex-end; justify-content: center; }
     .sheet { background: var(--card); border-radius: 16px 16px 0 0; padding: 14px 14px calc(14px + env(safe-area-inset-bottom)); width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto; }
     .sheet h2 { font-size: 17px; font-weight: 500; margin: 0 0 2px; }
@@ -223,7 +225,7 @@
     dropset: ["Drop set", "Weight dropped, straight after the last set"],
   };
   // The RPE box is a button that opens a big tap-friendly picker; the browser's own dropdown is cramped on a tablet.
-  function showRpe(btn, v) { btn.value = v || ""; btn.textContent = v ? String(v) : "–"; }
+  function showRpe(btn, v) { btn.value = v || ""; btn.textContent = v ? String(v) : "–"; btn.classList.toggle("none", !v); }
   // A bottom sheet of big buttons. items: [{ v, label, desc, on }]; picking one closes the sheet and calls onPick(v).
   function openSheet(title, hint, items, cols, onPick) {
     const scrim = el("div", "scrim");
@@ -679,7 +681,6 @@
 
       const rpe = el("button", "rpebtn"); rpe.type = "button"; rpe.setAttribute("aria-label", "RPE");
       showRpe(rpe, s.done ? (s.arpe || s.rpe) : s.rpe);
-      if (s.done) rpe.classList.add("actual");
       rpe.addEventListener("click", () => pickRpe(rpe.value, (v) => {
         showRpe(rpe, v);
         if (s.done) { s.arpe = v; applyAuto(ex); }           // the RPE you logged: the weight stays
@@ -694,7 +695,6 @@
         if (s.done && !s.arpe) s.arpe = s.rpe;   // from here the RPE box is the RPE you logged
         row.classList.toggle("done", s.done);
         showRpe(rpe, s.done ? (s.arpe || s.rpe) : s.rpe);
-        rpe.classList.toggle("actual", s.done);
         applyAuto(ex); saveDraft();
         if (s.done && s.type !== "warmup" && restSecs > 0) restStart(restSecs);   // the rest timer; warm-ups don't start it
       });
