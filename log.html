@@ -94,7 +94,8 @@
     .sheetgrid button.on { background: var(--accent); color: var(--bg); border-color: transparent; font-weight: 500; }
     .sheetgrid.list button { text-align: left; padding: 8px 14px; font-size: 17px; }
     .sheetgrid.list button.danger { color: var(--danger); }
-    .addset { width: 100%; min-height: 34px; margin-top: 2px; border: 0; background: var(--chip); color: var(--text); font-size: 14px; font-weight: 500; }
+    .setbar { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 2px; }
+    .addset { width: 100%; min-height: 34px; border: 0; background: var(--chip); color: var(--text); font-size: 14px; font-weight: 500; }
     .sheetgrid.list small { display: block; font-size: 13px; opacity: .75; font-weight: 400; }
     .sec { font-size: 13px; font-weight: 500; color: var(--muted); margin: 14px 0 6px; }
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
@@ -613,6 +614,36 @@
     return wrap;
   }
 
+  // Warm-up sets, only when you ask for them: last session's warm-ups (the same share of the first working weight
+  // and the same reps), or a standard ladder when there were none, such as a new movement.
+  const WARMUP_LADDER = [[0.40, 8], [0.55, 5], [0.70, 3], [0.85, 1]];
+  function warmupPlan(ex) {
+    const prev = (ex.ref.state && ex.ref.state.previous) || [];
+    const prevWork = prev.find((p) => p.type !== "warmup" && p.weight_lb > 0);
+    const prevWarm = prev.filter((p) => p.type === "warmup" && p.weight_lb > 0 && p.reps > 0);
+    if (prevWork && prevWarm.length) return prevWarm.map((p) => [p.weight_lb / prevWork.weight_lb, p.reps]);
+    return WARMUP_LADDER;
+  }
+  function addWarmups(ex) {
+    const first = ex.sets.find((s) => s.type !== "warmup" && !isNaN(num(s.kg)));
+    if (!first) { say("Give the first working set a weight (or an RPE) first, so the warm-ups have something to build on."); return; }
+    const top = num(first.kg), step = unit === "lb" ? ex.ref.stepLb / LB_PER_KG : ex.ref.stepKg;
+    const seen = new Set(), made = [];
+    for (const [ratio, reps] of warmupPlan(ex)) {
+      const kg = Math.round(top * ratio / step) * step;
+      const key = kg.toFixed(3);
+      if (!(kg > 0) || kg >= top || seen.has(key)) continue;   // nothing at or above the working weight, no doubles
+      seen.add(key);
+      made.push({ type: "warmup", kg: String(Math.round(kg * 1e6) / 1e6), reps: String(reps), rpe: "", done: false, manual: true });
+    }
+    if (!made.length) { say("The first working set is too light to warm up for."); return; }
+    say("");
+    // warm-ups you already ticked stay; the ones not done yet are replaced
+    const keep = ex.sets.filter((s) => s.type !== "warmup" || s.done);
+    ex.sets = [...keep.filter((s) => s.type === "warmup"), ...made, ...keep.filter((s) => s.type !== "warmup")];
+    saveDraft(); renderWorkout();
+  }
+
   function renderExercise(ex) {
     const card = el("section", "card");
     const head = el("div", "exhead"), left = el("div", "exleft"), right = el("div", "exright");   // side by side on a wide screen, stacked otherwise
@@ -711,7 +742,11 @@
       applyAuto(ex, next);
       saveDraft(); renderWorkout();
     });
-    right.append(add);
+    const warmBtn = el("button", "addset", "+ Warm-up sets"); warmBtn.type = "button";
+    warmBtn.addEventListener("click", () => addWarmups(ex));
+    const setbar = el("div", "setbar");
+    setbar.append(warmBtn, add);
+    right.append(setbar);
     return card;
   }
 
