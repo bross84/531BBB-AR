@@ -569,12 +569,14 @@
 
   // ── Workout screen ──────────────────────────────────────────────────────────
   function renderWorkout() {
+    const stay = !$("workout").hidden, y = window.scrollY;   // redrawing the workout you are already on keeps your place
     show("workout");
     $("title").value = draft.title;
     const list = $("exercises"); list.replaceChildren();
     cardEls.clear();
     for (const ex of draft.exercises) { const card = renderExercise(ex); cardEls.set(ex.id, card); list.append(card); }
     tickClock();
+    if (stay) window.scrollTo(0, y);
   }
 
   function fmtShortDate(iso) {
@@ -971,6 +973,8 @@
       sets: [{ type: "normal", kg: "", reps: "", rpe: "", done: false, manual: false }] };
     draft.exercises.push(added);
     saveDraft(); $("picker").hidden = true; renderWorkout();
+    const card = cardEls.get(added.id);
+    if (card) card.scrollIntoView({ block: "start" });   // take you to the exercise you just added
     loadState(added);
   }
 
