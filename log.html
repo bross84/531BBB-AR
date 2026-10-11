@@ -151,6 +151,7 @@
   </div>
 </div>
 
+<script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(function () {});</script>
 <script>
   const RPES = [4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10];
   const KIND = { normal: "", warmup: "W", failure: "F", dropset: "D" };

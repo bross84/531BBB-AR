@@ -74,6 +74,15 @@ class TestFrontDoor(unittest.TestCase):
             self.assertIn('media="(prefers-color-scheme: dark)" content="#161614"', html, path)
         self.assertEqual(200, self.client.get("/static/apple-touch-icon.png").status_code)
 
+    def test_a_service_worker_is_served_from_the_root_and_the_pages_register_it(self):
+        r = self.client.get("/sw.js")
+        self.assertEqual(200, r.status_code)
+        self.assertIn("javascript", r.headers["content-type"])
+        self.assertIn("fetch", r.text)
+        self.assertEqual("no-cache", r.headers["cache-control"])
+        for path in ("/log", "/recent"):
+            self.assertIn('serviceWorker.register("/sw.js")', self.client.get(path).text, path)
+
 
 if __name__ == "__main__":
     unittest.main()

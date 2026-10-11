@@ -87,6 +87,7 @@
   <button id="more" type="button" hidden>Load older workouts</button>
 </main>
 
+<script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(function () {});</script>
 <script>
   const state = { page: 0, pageCount: 1, loading: false };
   const $ = (id) => document.getElementById(id);

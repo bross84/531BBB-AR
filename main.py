@@ -58,6 +58,12 @@ def web_app_manifest():
     return FileResponse("static/manifest.webmanifest", media_type="application/manifest+json", headers=NO_CACHE)
 
 
+@app.get("/sw.js")
+def service_worker():
+    # Served from the root so it covers every page. It caches nothing; some browsers want one before offering "Install app".
+    return FileResponse("static/sw.js", media_type="text/javascript", headers=NO_CACHE)
+
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
