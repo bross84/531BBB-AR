@@ -72,9 +72,11 @@
     .scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, .45); z-index: 10; display: flex; align-items: flex-end; justify-content: center; }
     .sheet { background: var(--card); border-radius: 16px 16px 0 0; padding: 14px 14px calc(14px + env(safe-area-inset-bottom)); width: 100%; max-width: 520px; }
     .sheet h2 { font-size: 17px; font-weight: 500; margin: 0 0 2px; }
-    .rpegrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 12px 0 4px; }
-    .rpegrid button { min-height: 52px; padding: 0; font-size: 18px; font-variant-numeric: tabular-nums; }
-    .rpegrid button.on { background: var(--accent); color: var(--bg); border-color: transparent; font-weight: 500; }
+    .sheetgrid { display: grid; gap: 8px; margin: 12px 0 4px; }
+    .sheetgrid button { min-height: 52px; padding: 0; font-size: 18px; font-variant-numeric: tabular-nums; }
+    .sheetgrid button.on { background: var(--accent); color: var(--bg); border-color: transparent; font-weight: 500; }
+    .sheetgrid.list button { text-align: left; padding: 8px 14px; font-size: 17px; }
+    .sheetgrid.list small { display: block; font-size: 13px; opacity: .75; font-weight: 400; }
     .sec { font-size: 13px; font-weight: 500; color: var(--muted); margin: 14px 0 6px; }
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
     .sq { aspect-ratio: 1 / 1; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start;
@@ -141,23 +143,34 @@
 <script>
   const RPES = [4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10];
   const KIND = { normal: "", warmup: "W", failure: "F", dropset: "D" };
-  // The toggle in front of each set cycles through these. "ts" is a normal set that also sets the movement's TM
+  // The button in front of each set opens a sheet listing these. "ts" is a normal set that also sets the movement's TM
   // once the workout is saved; only one set per movement can be the TS.
   const KIND_ORDER = ["normal", "warmup", "ts", "failure", "dropset"];
+  const KIND_TEXT = {
+    normal: ["Set", "A normal working set"],
+    warmup: ["Warm-up", "Not counted as a working set"],
+    ts: ["TS", "Sets your TM when you save the workout"],
+    failure: ["Failure", "Taken to failure"],
+    dropset: ["Drop set", "Weight dropped, straight after the last set"],
+  };
   // The RPE box is a button that opens a big tap-friendly picker; the browser's own dropdown is cramped on a tablet.
   function showRpe(btn, v) { btn.value = v || ""; btn.textContent = v ? String(v) : "–"; }
-  function pickRpe(current, onPick) {
+  // A bottom sheet of big buttons. items: [{ v, label, desc, on }]; picking one closes the sheet and calls onPick(v).
+  function openSheet(title, hint, items, cols, onPick) {
     const scrim = el("div", "scrim");
     const sheet = el("div", "sheet");
-    sheet.setAttribute("role", "dialog"); sheet.setAttribute("aria-label", "Choose RPE");
-    sheet.append(el("h2", null, "RPE"), el("p", "muted", "10 none left · 9 one left · 8 two left · 7 three left"));
-    const grid = el("div", "rpegrid");
+    sheet.setAttribute("role", "dialog"); sheet.setAttribute("aria-label", title);
+    sheet.append(el("h2", null, title));
+    if (hint) sheet.append(el("p", "muted", hint));
+    const grid = el("div", "sheetgrid" + (cols === 1 ? " list" : ""));
+    grid.style.gridTemplateColumns = "repeat(" + cols + ", 1fr)";
     const onKey = (e) => { if (e.key === "Escape") close(); };
     const close = () => { scrim.remove(); document.removeEventListener("keydown", onKey); };
-    for (const v of RPES.map(String).concat([""])) {
-      const b = el("button", v !== "" && v === String(current) ? "on" : null, v === "" ? "Clear" : v);
+    for (const it of items) {
+      const b = el("button", it.on ? "on" : null, it.label);
       b.type = "button";
-      b.addEventListener("click", () => { close(); onPick(v); });
+      if (it.desc) b.append(el("small", null, it.desc));
+      b.addEventListener("click", () => { close(); onPick(it.v); });
       grid.append(b);
     }
     sheet.append(grid);
@@ -165,6 +178,15 @@
     scrim.addEventListener("click", (e) => { if (e.target === scrim) close(); });
     document.addEventListener("keydown", onKey);
     document.body.append(scrim);
+  }
+  function pickRpe(current, onPick) {
+    const items = RPES.map((v) => ({ v: String(v), label: String(v), on: String(v) === String(current) }));
+    items.push({ v: "", label: "Clear", on: false });
+    openSheet("RPE", "10 none left · 9 one left · 8 two left · 7 three left", items, 5, onPick);
+  }
+  function pickKind(current, onPick) {
+    const items = KIND_ORDER.map((v) => ({ v, label: KIND_TEXT[v][0], desc: KIND_TEXT[v][1], on: v === current }));
+    openSheet("Set type", "", items, 1, onPick);
   }
   function kindOf(s) { return s.type === "normal" && s.ts ? "ts" : s.type; }
   function setKind(ex, s, kind) {
@@ -321,7 +343,7 @@
     let note;
     if (!ts) note = "Checking for your TS…";
     else if (ts.found) note = "TM from your TS: " + trim(ts.weight_lb) + " lb × " + ts.reps + " @" + ts.rpe + ", " + fmtShortDate(ts.set_at) + " (" + daysAgo(ts.set_at) + ").";
-    else note = "No TS yet, so the TM is your last session's best set. Tap a set's number until it shows TS to mark one.";
+    else note = "No TS yet, so the TM is your last session's best set. Tap a set's number and choose TS to mark one.";
     const marked = markedTs(ex);
     if (marked) note += " TS marked on set " + marked.n + ": it becomes your TM when you save.";
     return note;
@@ -569,11 +591,10 @@
       const kind = el("button", "kind" + (k === "ts" ? " ts" : ""), k === "normal" ? String(working) : k === "ts" ? "TS" : KIND[s.type]);
       kind.type = "button";
       kind.setAttribute("aria-label", "Set type: " + (k === "ts" ? "TS, sets your TM when you save" : s.type));
-      kind.title = "Tap to change: set, warm-up, TS (sets your TM), failure, drop set";
-      kind.addEventListener("click", () => {
-        setKind(ex, s, KIND_ORDER[(KIND_ORDER.indexOf(k) + 1) % KIND_ORDER.length]);
+      kind.addEventListener("click", () => pickKind(k, (v) => {
+        setKind(ex, s, v);
         saveDraft(); renderWorkout();
-      });
+      }));
 
       const lb = el("input"); lb.type = "text"; lb.inputMode = "decimal"; lb.value = s.lb; lb.setAttribute("aria-label", "Weight in pounds");
       const kgLabel = el("span", "kg"), wcell = el("div", "wcell");
