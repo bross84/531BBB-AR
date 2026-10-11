@@ -51,8 +51,9 @@
     .cols { font-size: 11px; color: var(--muted); text-align: center; margin: 0 0 2px; padding: 0 4px; }   /* the same side inset as a set row (border and padding), so the labels sit over their boxes */
     .set { margin: 0 0 2px; padding: 0 4px; border-radius: 8px; }
     .set.done { background: var(--done); }
-    .set input, .set select { width: 100%; text-align: center; padding: 0 2px; min-height: 34px; height: 34px; font-size: 16px; font-weight: 500; border: 0; background: transparent; border-radius: 6px; }
-    .set input:focus { outline: none; background: var(--chip); }
+    .set input, .set select { width: 100%; text-align: center; padding: 0 2px; min-height: 34px; height: 34px; font-size: 16px; font-weight: 500; border: 0; background: var(--chip); border-radius: 8px; }
+    .set input:focus { outline: none; box-shadow: 0 0 0 1.5px var(--accent); }
+    .set.done input { background: transparent; }
     .set button { min-height: 34px; height: 34px; padding: 0; border: 0; background: transparent; }
     .set .kind { font-size: 14px; font-weight: 500; color: var(--muted); }
     .set .kind.ts { color: var(--accent); font-weight: 500; }
@@ -125,7 +126,6 @@
       .exleft { padding-top: 19px; }   /* lines the tiles up with the first set row, under the column labels */
       .tiles { flex-direction: column; }
       .tile { flex: none; }
-      .exright { max-width: 560px; }
       .cols, .set { grid-template-columns: 32px 1fr 48px 1fr 56px 36px; }
       #addEx { display: block; max-width: 560px; margin: 12px auto 0; }
       #recent { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
