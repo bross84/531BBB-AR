@@ -124,7 +124,18 @@ class HevyClient:
             resp.raise_for_status()
             return resp.json()
 
-    def exercise_history(self, exercise_template_id: str) -> list[dict]:
+    def list_body_measurements(self, page: int = 1, page_size: int = 10) -> dict:
+        """Fetch one page of daily body measurements, newest first. Raises on HTTP or network errors."""
+        with httpx.Client(timeout=30) as client:
+            resp = client.get(
+                f"{_BASE_URL}/body_measurements",
+                headers=self._headers(),
+                params={"page": page, "pageSize": page_size},
+            )
+            resp.raise_for_status()
+            return resp.json()
+
+    def exercise_history(self,exercise_template_id: str) -> list[dict]:
         """Every logged set for one exercise across all sessions, newest first. Raises on HTTP or network errors."""
         with httpx.Client(timeout=30) as client:
             resp = client.get(

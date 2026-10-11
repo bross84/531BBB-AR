@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from database import get_db, get_rpe_percentage, init_db
+import body_weight
 import hevy_client
 import exercise_state
 import program_parser
@@ -1805,6 +1806,24 @@ def get_exercises():
 def sync_exercises():
     count = hevy_client.HevyClient().sync_exercise_cache()
     return {"cached": count}
+
+
+class BodyMeasurementOut(BaseModel):
+    date: str
+    weight_kg: float
+    lean_mass_kg: float | None = None
+    fat_percent: float | None = None
+
+
+@app.post("/body-weight/sync")
+def sync_body_weight():
+    count = body_weight.sync_body_measurements(hevy_client.HevyClient())
+    return {"synced": count}
+
+
+@app.get("/body-weight", response_model=list[BodyMeasurementOut])
+def get_body_weight():
+    return body_weight.list_body_measurements()
 
 
 @app.get("/exercises/{hevy_exercise_id}/e1rm")

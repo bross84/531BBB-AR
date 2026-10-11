@@ -153,6 +153,14 @@ def init_db() -> None:
                 chain_kg REAL NOT NULL DEFAULT 0,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
             );
+
+            CREATE TABLE IF NOT EXISTS body_measurements (
+                date TEXT PRIMARY KEY,
+                weight_kg REAL NOT NULL,
+                lean_mass_kg REAL,
+                fat_percent REAL,
+                synced_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
         """)
 
         try:
