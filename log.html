@@ -67,7 +67,14 @@
     .stepline select { min-height: 0; padding: 2px 4px; font-size: 13px; }
     .pill { align-self: center; padding: 8px 12px; min-height: 40px; border-radius: 20px; font-size: 13px; color: var(--muted); }
     .pill.on { color: var(--accent); border-color: var(--accent); }
-    .set select.actual { border-color: var(--accent); color: var(--accent); }
+    .set .rpebtn { width: 100%; padding: 6px 2px; text-align: center; }
+    .set .rpebtn.actual { border-color: var(--accent); color: var(--accent); }
+    .scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, .45); z-index: 10; display: flex; align-items: flex-end; justify-content: center; }
+    .sheet { background: var(--card); border-radius: 16px 16px 0 0; padding: 14px 14px calc(14px + env(safe-area-inset-bottom)); width: 100%; max-width: 520px; }
+    .sheet h2 { font-size: 17px; font-weight: 500; margin: 0 0 2px; }
+    .rpegrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 12px 0 4px; }
+    .rpegrid button { min-height: 52px; padding: 0; font-size: 18px; font-variant-numeric: tabular-nums; }
+    .rpegrid button.on { background: var(--accent); color: var(--bg); border-color: transparent; font-weight: 500; }
     .sec { font-size: 13px; font-weight: 500; color: var(--muted); margin: 14px 0 6px; }
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
     .sq { aspect-ratio: 1 / 1; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start;
@@ -137,6 +144,28 @@
   // The toggle in front of each set cycles through these. "ts" is a normal set that also sets the movement's TM
   // once the workout is saved; only one set per movement can be the TS.
   const KIND_ORDER = ["normal", "warmup", "ts", "failure", "dropset"];
+  // The RPE box is a button that opens a big tap-friendly picker; the browser's own dropdown is cramped on a tablet.
+  function showRpe(btn, v) { btn.value = v || ""; btn.textContent = v ? String(v) : "–"; }
+  function pickRpe(current, onPick) {
+    const scrim = el("div", "scrim");
+    const sheet = el("div", "sheet");
+    sheet.setAttribute("role", "dialog"); sheet.setAttribute("aria-label", "Choose RPE");
+    sheet.append(el("h2", null, "RPE"), el("p", "muted", "10 none left · 9 one left · 8 two left · 7 three left"));
+    const grid = el("div", "rpegrid");
+    const onKey = (e) => { if (e.key === "Escape") close(); };
+    const close = () => { scrim.remove(); document.removeEventListener("keydown", onKey); };
+    for (const v of RPES.map(String).concat([""])) {
+      const b = el("button", v !== "" && v === String(current) ? "on" : null, v === "" ? "Clear" : v);
+      b.type = "button";
+      b.addEventListener("click", () => { close(); onPick(v); });
+      grid.append(b);
+    }
+    sheet.append(grid);
+    scrim.append(sheet);
+    scrim.addEventListener("click", (e) => { if (e.target === scrim) close(); });
+    document.addEventListener("keydown", onKey);
+    document.body.append(scrim);
+  }
   function kindOf(s) { return s.type === "normal" && s.ts ? "ts" : s.type; }
   function setKind(ex, s, kind) {
     s.ts = kind === "ts";
@@ -566,15 +595,15 @@
       const reps = el("input"); reps.type = "text"; reps.inputMode = "numeric"; reps.value = s.reps; reps.setAttribute("aria-label", "Reps");
       reps.addEventListener("input", () => { s.reps = reps.value; applyAuto(ex, s.done ? null : s); saveDraft(); });
 
-      const rpe = el("select"); rpe.setAttribute("aria-label", "RPE");
-      for (const v of [""].concat(RPES)) { const o = el("option", null, v === "" ? "–" : String(v)); o.value = String(v); rpe.append(o); }
-      rpe.value = s.done ? (s.arpe || s.rpe) : s.rpe;
+      const rpe = el("button", "rpebtn"); rpe.type = "button"; rpe.setAttribute("aria-label", "RPE");
+      showRpe(rpe, s.done ? (s.arpe || s.rpe) : s.rpe);
       if (s.done) rpe.classList.add("actual");
-      rpe.addEventListener("change", () => {
-        if (s.done) { s.arpe = rpe.value; applyAuto(ex); }   // the RPE you logged: the weight stays
-        else { s.rpe = rpe.value; applyAuto(ex, s); }        // the plan: the weight follows it
+      rpe.addEventListener("click", () => pickRpe(rpe.value, (v) => {
+        showRpe(rpe, v);
+        if (s.done) { s.arpe = v; applyAuto(ex); }           // the RPE you logged: the weight stays
+        else { s.rpe = v; applyAuto(ex, s); }                // the plan: the weight follows it
         saveDraft();
-      });
+      }));
 
       const tick = el("button", "tick", "✓");
       tick.type = "button"; tick.setAttribute("aria-label", "Mark set done");
@@ -582,7 +611,7 @@
         s.done = !s.done;
         if (s.done && !s.arpe) s.arpe = s.rpe;   // from here the RPE box is the RPE you logged
         row.classList.toggle("done", s.done);
-        rpe.value = s.done ? (s.arpe || s.rpe) : s.rpe;
+        showRpe(rpe, s.done ? (s.arpe || s.rpe) : s.rpe);
         rpe.classList.toggle("actual", s.done);
         applyAuto(ex); saveDraft();
       });
