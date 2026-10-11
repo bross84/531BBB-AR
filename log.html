@@ -171,6 +171,9 @@
       .bar > div, .overlay > div { max-width: 1000px; }
       .grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
     }
+    /* while you type, the on-screen keyboard covers much of the screen: give the page room to scroll above it and hide the bottom bar */
+    body.typing .bar { display: none; }
+    body.typing main { padding-bottom: 60vh; }
     [hidden] { display: none !important; }
   </style>
 </head>
@@ -1194,6 +1197,27 @@
   $("unitKg").addEventListener("click", () => setUnit("kg"));
   $("unitLb").addEventListener("click", () => setUnit("lb"));
   showUnit();
+
+  // ── Typing ───────────────────────────────────────────────────────────────────
+  // Tapping a weight or reps box opens the on-screen keyboard, which is huge in landscape. Hide the bottom bar, leave room to
+  // scroll the last row above the keyboard, and lift the box you tapped into the part of the screen that stays visible.
+  let typingTimer = null;
+  function liftIntoView(input) {
+    if (document.activeElement !== input) return;
+    const vv = window.visualViewport, visible = vv ? vv.height : window.innerHeight;
+    const top = input.getBoundingClientRect().top, want = visible * 0.3;   // a little way down, so the next sets show below it
+    if (Math.abs(top - want) > 40) window.scrollBy({ top: top - want, behavior: "smooth" });
+  }
+  document.addEventListener("focusin", (e) => {
+    if (!e.target.matches || !e.target.matches("#exercises input")) return;
+    clearTimeout(typingTimer);
+    document.body.classList.add("typing");
+    setTimeout(() => liftIntoView(e.target), 350);   // after the keyboard has finished opening
+  });
+  document.addEventListener("focusout", () => {
+    clearTimeout(typingTimer);
+    typingTimer = setTimeout(() => document.body.classList.remove("typing"), 150);   // moving between boxes is not leaving
+  });
 
   // ── Boot ────────────────────────────────────────────────────────────────────
   loadReference().then(() => {
