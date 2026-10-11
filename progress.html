@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png" />
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f6f5f1" />
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#161614" />
+  <title>Progress</title>
+  <style>
+    :root {
+      --bg: #f6f5f1; --card: #ffffff; --text: #1d1d1b; --muted: #6b6a64;
+      --line: #e3e1d9; --accent: #1f5fbf; --chip: #eef0f4;
+      --weight: #b3641a; --danger: #a32d2d; --danger-bg: #fcebeb;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #161614; --card: #21211e; --text: #ecebe5; --muted: #a09f97;
+        --line: #34332f; --accent: #7fb0ff; --chip: #2b2c30;
+        --weight: #e8a15c; --danger: #f09595; --danger-bg: #3a1f1f;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    main { max-width: 760px; margin: 0 auto; padding: 16px; }
+    header { display: flex; justify-content: space-between; align-items: baseline; }
+    header a { color: var(--accent); }
+    h1 { font-size: 22px; font-weight: 500; margin: 8px 0 16px; }
+    h2 { font-size: 15px; font-weight: 500; margin: 0 0 2px; }
+    .card {
+      background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+      padding: 14px 16px; margin: 0 0 12px;
+    }
+    .lifts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 0 0 12px; }
+    .lifts button {
+      font: inherit; min-height: 44px; border-radius: 10px; border: 1px solid var(--line);
+      background: var(--card); color: var(--text); cursor: pointer;
+    }
+    .lifts button[aria-pressed="true"] { background: var(--accent); color: var(--card); border-color: transparent; }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0 0 12px; }
+    .stat { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+    .stat .k { font-size: 12px; color: var(--muted); }
+    .stat .v { font-size: 20px; font-variant-numeric: tabular-nums; }
+    .stat .d { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .note { font-size: 13px; color: var(--muted); margin: 6px 0 0; }
+    .error { background: var(--danger-bg); color: var(--danger); border-radius: 10px; padding: 10px 12px; margin: 0 0 12px; }
+    .empty { text-align: center; color: var(--muted); padding: 32px 0; }
+    svg { width: 100%; height: auto; display: block; }
+    svg text { fill: var(--muted); font-size: 11px; font-family: inherit; }
+    .legend { display: flex; gap: 14px; font-size: 13px; color: var(--muted); margin: 2px 0 6px; }
+    .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; }
+    @media (min-width: 900px) { main { max-width: 1000px; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Progress</h1>
+    <a href="/log">Log workout</a>
+  </header>
+  <div id="status"></div>
+  <div class="lifts" id="lifts" role="group" aria-label="Lift">
+    <button type="button" data-lift="squat">Squat</button>
+    <button type="button" data-lift="bench">Bench</button>
+    <button type="button" data-lift="deadlift">Deadlift</button>
+    <button type="button" data-lift="press">Press</button>
+  </div>
+  <div id="stats" class="stats" hidden></div>
+  <div id="charts"></div>
+  <p class="note" id="foot" hidden>
+    Score is DOTS applied to this lift's e1RM (RPE table, best set per workout) at your 7-day average bodyweight.
+    It is a trend against your own history, not comparable to powerlifting tables. Sets logged without an RPE are left out.
+  </p>
+</main>
+
+<script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(function () {});</script>
+<script>
+  const $ = (id) => document.getElementById(id);
+  const NS = "http://www.w3.org/2000/svg";
+  const LIFT_KEY = "progress.lift";
+  let current = "squat";
+  let loadId = 0;
+
+  try { current = localStorage.getItem(LIFT_KEY) || current; } catch (e) { /* storage can be unavailable */ }
+
+  function el(tag, cls, text) {
+    const node = document.createElement(tag);
+    if (cls) node.className = cls;
+    if (text != null) node.textContent = text;
+    return node;
+  }
+  function svg(tag, attrs, text) {
+    const node = document.createElementNS(NS, tag);
+    for (const k in attrs) node.setAttribute(k, attrs[k]);
+    if (text != null) node.textContent = text;
+    return node;
+  }
+  function showError(msg) {
+    const box = $("status");
+    box.replaceChildren();
+    if (msg) box.append(el("div", "error", msg));
+  }
+
+  let showYear = false; // set per chart: add the year to dates when the data spans more than a year
+  function fmtDate(iso) {
+    const d = new Date(iso + "T12:00:00");
+    return d.toLocaleDateString(undefined, showYear ? { month: "short", day: "numeric", year: "2-digit" } : { month: "short", day: "numeric" });
+  }
+
+  /* One line chart. lines: [{key, color, axis: "left"|"right"}]; each axis scales to its own data. */
+  function chart(points, lines, fmtLeft, fmtRight) {
+    const W = 700, H = 240, padL = 46, padR = fmtRight ? 46 : 12, padT = 10, padB = 24;
+    const root = svg("svg", { viewBox: `0 0 ${W} ${H}`, role: "img" });
+    const t0 = new Date(points[0].date).getTime();
+    const t1 = new Date(points[points.length - 1].date).getTime();
+    showYear = t1 - t0 > 300 * 86400000;
+    const x = (p) => padL + (t1 === t0 ? (W - padL - padR) / 2 : ((new Date(p.date).getTime() - t0) / (t1 - t0)) * (W - padL - padR));
+
+    const range = {};
+    for (const side of ["left", "right"]) {
+      const vals = [];
+      for (const l of lines) if (l.axis === side) for (const p of points) if (p[l.key] != null) vals.push(p[l.key]);
+      if (!vals.length) continue;
+      let lo = Math.min(...vals), hi = Math.max(...vals);
+      const pad = (hi - lo || hi * 0.05 || 1) * 0.15;
+      range[side] = [lo - pad, hi + pad];
+    }
+    const y = (side, v) => padT + (1 - (v - range[side][0]) / (range[side][1] - range[side][0])) * (H - padT - padB);
+
+    for (let i = 0; i <= 3; i++) {
+      const gy = padT + (i / 3) * (H - padT - padB);
+      root.append(svg("line", { x1: padL, x2: W - padR, y1: gy, y2: gy, stroke: "var(--line)", "stroke-width": 1 }));
+      if (range.left) root.append(svg("text", { x: padL - 6, y: gy + 4, "text-anchor": "end" }, fmtLeft(range.left[1] - (i / 3) * (range.left[1] - range.left[0]))));
+      if (range.right && fmtRight) root.append(svg("text", { x: W - padR + 6, y: gy + 4 }, fmtRight(range.right[1] - (i / 3) * (range.right[1] - range.right[0]))));
+    }
+    root.append(svg("text", { x: padL, y: H - 6 }, fmtDate(points[0].date)));
+    root.append(svg("text", { x: W - padR, y: H - 6, "text-anchor": "end" }, fmtDate(points[points.length - 1].date)));
+
+    for (const l of lines) {
+      if (!range[l.axis]) continue;
+      const pts = points.filter((p) => p[l.key] != null);
+      if (!pts.length) continue;
+      const d = pts.map((p, i) => (i ? "L" : "M") + x(p).toFixed(1) + " " + y(l.axis, p[l.key]).toFixed(1)).join(" ");
+      root.append(svg("path", { d, fill: "none", stroke: l.color, "stroke-width": 2, "stroke-linejoin": "round" }));
+      for (const p of pts) {
+        const dot = svg("circle", { cx: x(p).toFixed(1), cy: y(l.axis, p[l.key]).toFixed(1), r: 3, fill: l.color });
+        dot.append(svg("title", {}, `${fmtDate(p.date)}: ${l.label} ${(l.axis === "left" ? fmtLeft : fmtRight || fmtLeft)(p[l.key])}`));
+        root.append(dot);
+      }
+    }
+    return root;
+  }
+
+  function legend(items) {
+    const box = el("div", "legend");
+    for (const it of items) {
+      const span = el("span", null, it.label);
+      const sw = el("i"); sw.style.background = it.color;
+      span.prepend(sw);
+      box.append(span);
+    }
+    return box;
+  }
+
+  function stat(label, now, start, fmt, unit, since) {
+    const box = el("div", "stat");
+    box.append(el("div", "k", label), el("div", "v", fmt(now) + (unit || "")));
+    if (start != null && start !== 0) {
+      const pct = ((now - start) / start) * 100;
+      box.append(el("div", "d", (pct >= 0 ? "+" : "") + pct.toFixed(1) + "% since " + since));
+    }
+    return box;
+  }
+
+  const round0 = (v) => String(Math.round(v));
+  const round1 = (v) => (Math.round(v * 10) / 10).toFixed(1);
+
+  function render(data) {
+    const stats = $("stats"), charts = $("charts"), foot = $("foot");
+    charts.replaceChildren();
+    stats.replaceChildren();
+    const series = data.series;
+    if (!series.length) {
+      stats.hidden = true; foot.hidden = true;
+      charts.append(el("div", "empty", "No sets with an RPE logged for " + data.title + " yet."));
+      return;
+    }
+    const scored = series.filter((p) => p.dots != null);
+    stats.hidden = false; foot.hidden = false;
+    // All three tiles compare over the same stretch: from the first scored session (the first with a recent
+    // weigh-in) to the latest. Without any score, e1RM alone compares over the whole history.
+    const span = scored.length ? scored : series;
+    const a = span[0], b = span[span.length - 1];
+    showYear = new Date(b.date) - new Date(a.date) > 300 * 86400000;
+    const since = fmtDate(a.date);
+    if (scored.length) stats.append(stat("Strength score", b.dots, a.dots, round1, "", since));
+    stats.append(stat("e1RM", b.e1rm_lb, a.e1rm_lb, round0, " lb", since));
+    if (scored.length) stats.append(stat("Bodyweight", b.bodyweight_lb, a.bodyweight_lb, round1, " lb", since));
+
+    if (scored.length) {
+      const card = el("div", "card");
+      card.append(el("h2", null, "Strength score"), legend([{ label: "DOTS-style score", color: "var(--accent)" }]));
+      card.append(chart(scored, [{ key: "dots", color: "var(--accent)", axis: "left", label: "score" }], round1));
+      charts.append(card);
+    } else {
+      charts.append(el("div", "error", "No bodyweight found yet, so there is no score. Check that Hevy has weigh-ins (Apple Health sync)."));
+    }
+
+    const card = el("div", "card");
+    card.append(el("h2", null, "e1RM and bodyweight"), legend([
+      { label: "e1RM (lb, left)", color: "var(--accent)" },
+      { label: "Bodyweight, 7-day avg (lb, right)", color: "var(--weight)" },
+    ]));
+    card.append(chart(series, [
+      { key: "e1rm_lb", color: "var(--accent)", axis: "left", label: "e1RM" },
+      { key: "bodyweight_lb", color: "var(--weight)", axis: "right", label: "bodyweight" },
+    ], (v) => round0(v) + "", (v) => round0(v) + ""));
+    charts.append(card);
+  }
+
+  async function load() {
+    const id = ++loadId;
+    for (const b of document.querySelectorAll("#lifts button")) b.setAttribute("aria-pressed", String(b.dataset.lift === current));
+    showError("");
+    $("charts").replaceChildren(el("div", "empty", "Loading…"));
+    try {
+      const res = await fetch("/progress/data?lift=" + encodeURIComponent(current));
+      if (id !== loadId) return; // a newer lift was picked while this one loaded
+      if (!res.ok) {
+        let detail = "Couldn't load progress (" + res.status + ").";
+        try { detail = (await res.json()).detail || detail; } catch (e) { /* keep the generic message */ }
+        $("charts").replaceChildren();
+        $("stats").hidden = true; $("foot").hidden = true;
+        showError(detail);
+        return;
+      }
+      render(await res.json());
+    } catch (e) {
+      if (id !== loadId) return;
+      $("charts").replaceChildren();
+      showError("Couldn't reach the server.");
+    }
+  }
+
+  $("lifts").addEventListener("click", (event) => {
+    const lift = event.target.dataset && event.target.dataset.lift;
+    if (!lift || lift === current) return;
+    current = lift;
+    try { localStorage.setItem(LIFT_KEY, lift); } catch (e) { /* storage can be unavailable */ }
+    load();
+  });
+
+  // Refresh the stored weigh-ins from Hevy first (read-only), then draw. A failed sync still draws what is stored.
+  fetch("/body-weight/sync", { method: "POST" }).catch(() => {}).then(load);
+</script>
+</body>
+</html>

@@ -1,4 +1,5 @@
 import json
+import os
 from collections import defaultdict
 from contextlib import asynccontextmanager
 from typing import Any, Literal
@@ -18,6 +19,7 @@ import body_weight
 import hevy_client
 import exercise_state
 import program_parser
+import progress
 import refs_store
 import training_max
 from wave_math import bbb_weight, epley, joker_qualifies, joker_weight, round_weight, session_e1rm, working_weight
@@ -1824,6 +1826,39 @@ def sync_body_weight():
 @app.get("/body-weight", response_model=list[BodyMeasurementOut])
 def get_body_weight():
     return body_weight.list_body_measurements()
+
+
+class ProgressPoint(BaseModel):
+    date: str
+    e1rm_lb: float
+    bodyweight_lb: float | None = None
+    dots: float | None = None
+
+
+class ProgressData(BaseModel):
+    lift: str
+    title: str
+    series: list[ProgressPoint]
+
+
+@app.get("/progress")
+def progress_page():
+    return FileResponse("progress.html", headers=NO_CACHE)
+
+
+@app.get("/progress/data", response_model=ProgressData)
+def get_progress_data(lift: Literal["squat", "bench", "deadlift", "press"]):
+    """A main lift's e1RM per session (Hevy history + the RPE table) next to smoothed bodyweight and DOTS."""
+    title = progress.LIFT_TITLES[lift]
+    with get_db() as conn:
+        row = conn.execute("SELECT id FROM hevy_exercise_cache WHERE title = ?", (title,)).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"'{title}' isn't in the exercise cache. Sync exercises first.")
+    entries = _call_hevy(lambda client: client.exercise_history(row["id"]))
+    sessions = progress.e1rm_by_session(entries, get_rpe_percentage)
+    sex = "female" if os.getenv("DOTS_SEX", "male").lower() == "female" else "male"
+    series = progress.build_series(sessions, body_weight.list_body_measurements(), sex)
+    return {"lift": lift, "title": title, "series": series}
 
 
 @app.get("/exercises/{hevy_exercise_id}/e1rm")

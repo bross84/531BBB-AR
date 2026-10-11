@@ -12,6 +12,7 @@ Deployed via Docker on CasaOS, used as a desktop PWA and mobile PWA.
 - **Autoregulated weights** — working weights computed at session time from a live e1RM, anchored by AMRAP sets and averaged Joker sets within a ±5% band
 - **BBB volume** — starting weight derived from averaged e1RM × 65/70/75% by wave week; freely overridable per session
 - **Hevy logging** — the workout log page (`/log`) saves a finished workout to Hevy via `POST /v1/workouts`; the original app (`/legacy`) saves locally only
+- **Progress** — `/progress` charts each main lift's e1RM (Hevy history + the RPE table) against your 7-day average bodyweight (Apple Health via Hevy) and a DOTS-style strength score, so a cut can be told apart from lost strength. Set `DOTS_SEX=female` for the female coefficients (default male). Which Hevy exercise each lift reads is `LIFT_TITLES` in `progress.py`
 - **Exercise cache** — Hevy exercise list pulled and cached at setup, used throughout for slot configuration and the exercise picker
 
 ---
