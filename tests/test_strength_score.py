@@ -69,7 +69,11 @@ class WeightOnTest(unittest.TestCase):
 
     def test_falls_back_to_latest_earlier_reading(self):
         self.assertEqual(weight_on(self.SMOOTHED, "2026-10-03"), 80.0)
-        self.assertEqual(weight_on(self.SMOOTHED, "2026-12-01"), 78.0)
+        self.assertEqual(weight_on(self.SMOOTHED, "2026-10-19"), 78.0)  # 14 days after the last reading
+
+    def test_a_stale_reading_is_not_used(self):
+        self.assertIsNone(weight_on(self.SMOOTHED, "2026-10-20"))  # 15 days after the last reading
+        self.assertEqual(weight_on(self.SMOOTHED, "2026-10-20", max_age_days=30), 78.0)
 
     def test_none_before_first_reading(self):
         self.assertIsNone(weight_on(self.SMOOTHED, "2026-09-30"))

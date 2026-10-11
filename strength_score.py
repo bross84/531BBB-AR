@@ -48,13 +48,18 @@ def smooth_body_weight(measurements: list[dict], window_days: int = 7) -> list[d
     return smoothed
 
 
-def weight_on(smoothed: list[dict], on: str) -> float | None:
+def weight_on(smoothed: list[dict], on: str, max_age_days: int = 14) -> float | None:
     """Smoothed bodyweight to use for a lift performed on `on` (YYYY-MM-DD): the latest reading on or
-    before that date, so a missing day falls back to the most recent known weight. None if there is none."""
+    before that date, so a missing day falls back to the most recent known weight. None if there is no
+    reading, or the latest is more than `max_age_days` old (a months-old weight would give a made-up score)."""
     best = None
     for row in smoothed:
         if row["date"] <= on:
-            best = row["weight_kg"]
+            best = row
         else:
             break
-    return best
+    if best is None:
+        return None
+    if (date.fromisoformat(on) - date.fromisoformat(best["date"])).days > max_age_days:
+        return None
+    return best["weight_kg"]
