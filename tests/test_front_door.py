@@ -69,6 +69,9 @@ class TestFrontDoor(unittest.TestCase):
             html = self.client.get(path).text
             self.assertIn('rel="manifest" href="/manifest.webmanifest"', html, path)
             self.assertIn('rel="apple-touch-icon" href="/static/apple-touch-icon.png"', html, path)
+            # the browser bar follows the system light/dark setting, like the page itself
+            self.assertIn('media="(prefers-color-scheme: light)" content="#f6f5f1"', html, path)
+            self.assertIn('media="(prefers-color-scheme: dark)" content="#161614"', html, path)
         self.assertEqual(200, self.client.get("/static/apple-touch-icon.png").status_code)
 
 
