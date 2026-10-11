@@ -23,7 +23,7 @@
     }
     * { box-sizing: border-box; }
     body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-    main { max-width: 560px; margin: 0 auto; padding: 12px; padding-bottom: 96px; }
+    main { max-width: 560px; margin: 0 auto; padding: 12px; padding-bottom: 150px; }
     header { display: flex; justify-content: space-between; align-items: baseline; margin: 6px 0 12px; }
     h1 { font-size: 22px; font-weight: 500; margin: 0; }
     a { color: var(--accent); }
@@ -90,12 +90,21 @@
     .msg.ok { background: var(--ok-bg); color: var(--ok); }
     .bar { position: fixed; left: 0; right: 0; bottom: 0; background: var(--bg); border-top: 1px solid var(--line); padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); }
     .bar > div { max-width: 560px; margin: 0 auto; }
+    .rest { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; }
+    .rest button { min-height: 44px; padding: 0 14px; }
+    .restdef { flex: 1; text-align: left; color: var(--muted); }
+    .resttime { flex: 1; font-size: 26px; font-weight: 500; line-height: 1; font-variant-numeric: tabular-nums; }
+    .rest.done .resttime { color: var(--accent); animation: restflash 1s steps(1, end) infinite; }
+    @keyframes restflash { 50% { opacity: .3; } }
     .overlay { position: fixed; inset: 0; background: var(--bg); z-index: 5; overflow-y: auto; padding: 12px; }
     .overlay > div { max-width: 560px; margin: 0 auto; }
     /* Wide screens (a tablet on its side): each exercise is one band, the e1RM, TM and buttons on the left and the
        sets on the right, so a whole exercise fits on screen without scrolling. */
     @media (min-width: 900px) {
-      main { max-width: 1000px; }
+      main { max-width: 1000px; padding-bottom: 96px; }
+      .bar > div { display: flex; align-items: center; gap: 12px; }
+      .rest { flex: 1; margin: 0; }
+      #finish { width: 320px; flex: none; }
       #exercises .card { display: grid; grid-template-columns: 340px minmax(0, 1fr); column-gap: 16px; align-items: start; }
       .exhead { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin: 0 0 8px; }
       .exhead .ex-title, .exhead .last { margin: 0; }
@@ -145,7 +154,16 @@
   </section>
 </main>
 
-<div id="bar" class="bar" hidden><div><button id="finish" class="primary wide" type="button">Finish and save to Hevy</button></div></div>
+<div id="bar" class="bar" hidden><div>
+  <div id="rest" class="rest">
+    <button id="restPick" class="restdef" type="button" aria-label="Choose the rest time"></button>
+    <span id="restTime" class="resttime" hidden></span>
+    <button id="restMinus" type="button" hidden aria-label="15 seconds less">−15</button>
+    <button id="restPlus" type="button" hidden aria-label="15 seconds more">+15</button>
+    <button id="restMain" type="button"></button>
+  </div>
+  <button id="finish" class="primary wide" type="button">Finish and save to Hevy</button>
+</div></div>
 
 <div id="picker" class="overlay" hidden>
   <div>
@@ -229,7 +247,7 @@
     try { localStorage.setItem(KEY, JSON.stringify(draft)); } catch (e) {}
     if (draft) draft.exercises.forEach(refreshE1rm);
   }
-  function clearDraft() { draft = null; try { localStorage.removeItem(KEY); } catch (e) {} }
+  function clearDraft() { draft = null; try { localStorage.removeItem(KEY); } catch (e) {} restStop(); }
 
   function say(text, kind) {
     const box = $("msg"); box.replaceChildren();
@@ -239,6 +257,7 @@
   function show(name) {
     for (const id of ["start", "workout", "done"]) $(id).hidden = id !== name;
     $("bar").hidden = name !== "workout";
+    if (name === "workout") keepAwake(); else if (wake) { wake.release(); wake = null; }
     window.scrollTo(0, 0);
   }
 
@@ -656,6 +675,7 @@
         showRpe(rpe, s.done ? (s.arpe || s.rpe) : s.rpe);
         rpe.classList.toggle("actual", s.done);
         applyAuto(ex); saveDraft();
+        if (s.done && s.type !== "warmup" && restSecs > 0) restStart(restSecs);   // the rest timer; warm-ups don't start it
       });
 
       row.append(kind, wcell, reps, rpe, tick);
@@ -841,6 +861,82 @@
       saving = false; $("finish").disabled = false; $("finish").textContent = "Finish and save to Hevy";
     }
   });
+
+  // ── Rest timer ──────────────────────────────────────────────────────
+  // Starts by itself when you tick a working set (warm-ups don't), counts down in the bar, and buzzes and beeps at zero.
+  // The end time is kept in localStorage, so a reload doesn't lose it. The screen is kept awake where the browser
+  // allows it (HTTPS only), because a sleeping page can't buzz.
+  const REST_OPTIONS = [0, 60, 90, 120, 150, 180, 240, 300];
+  let restSecs = 180, restEnd = null, restDone = false, restTimer = null, audio = null, wake = null;
+  try {
+    const saved = Number(localStorage.getItem("restSecs"));
+    if (localStorage.getItem("restSecs") !== null && REST_OPTIONS.includes(saved)) restSecs = saved;
+    const end = Number(localStorage.getItem("restEnd"));
+    if (end > Date.now()) restEnd = end;
+  } catch (e) {}
+  const mmss = (secs) => Math.floor(secs / 60) + ":" + String(secs % 60).padStart(2, "0");
+  const restLabel = (secs) => (secs ? mmss(secs) : "Off");
+  function restSave() {
+    try {
+      localStorage.setItem("restSecs", String(restSecs));
+      if (restEnd !== null) localStorage.setItem("restEnd", String(restEnd)); else localStorage.removeItem("restEnd");
+    } catch (e) {}
+  }
+  function restRender() {
+    const running = restEnd !== null, active = running || restDone;
+    $("rest").classList.toggle("done", restDone);
+    $("restPick").hidden = active;
+    $("restTime").hidden = !active;
+    $("restMinus").hidden = !running; $("restPlus").hidden = !running;
+    $("restPick").textContent = "Rest " + restLabel(restSecs) + " ▾";
+    $("restMain").textContent = running ? "Skip" : restDone ? "Dismiss" : "Start";
+    if (running) $("restTime").textContent = mmss(Math.max(0, Math.ceil((restEnd - Date.now()) / 1000)));
+    else if (restDone) $("restTime").textContent = "Rest over";
+  }
+  function restBeep() {
+    try { if (navigator.vibrate) navigator.vibrate([250, 120, 250, 120, 250]); } catch (e) {}
+    try {
+      if (!audio) return;
+      const t0 = audio.currentTime;
+      for (let i = 0; i < 3; i++) {
+        const osc = audio.createOscillator(), gain = audio.createGain(), at = t0 + i * 0.3;
+        osc.frequency.value = 880; osc.connect(gain); gain.connect(audio.destination);
+        gain.gain.setValueAtTime(0.25, at); gain.gain.setValueAtTime(0, at + 0.18);
+        osc.start(at); osc.stop(at + 0.2);
+      }
+    } catch (e) {}
+  }
+  function restLoop() {
+    if (restEnd === null) return;
+    if (Date.now() >= restEnd) { restEnd = null; restDone = true; clearInterval(restTimer); restSave(); restBeep(); }
+    restRender();
+  }
+  function restStart(secs) {
+    // the sound is set up here, inside a tap, because the browser only lets a page beep later if it was allowed to now
+    try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); if (audio.state === "suspended") audio.resume(); } catch (e) {}
+    restEnd = Date.now() + secs * 1000; restDone = false; restSave();
+    clearInterval(restTimer); restTimer = setInterval(restLoop, 250); restRender();
+  }
+  function restStop() { restEnd = null; restDone = false; clearInterval(restTimer); restSave(); restRender(); }
+  async function keepAwake() {
+    try {
+      if (navigator.wakeLock && !document.hidden && !wake) {
+        wake = await navigator.wakeLock.request("screen");
+        wake.addEventListener("release", () => { wake = null; });
+      }
+    } catch (e) {}
+  }
+  $("restMain").addEventListener("click", () => { if (restEnd !== null || restDone) restStop(); else restStart(restSecs || 180); });
+  $("restMinus").addEventListener("click", () => { if (restEnd !== null) { restEnd = Math.max(Date.now() + 1000, restEnd - 15000); restSave(); restRender(); } });
+  $("restPlus").addEventListener("click", () => { if (restEnd !== null) { restEnd += 15000; restSave(); restRender(); } });
+  $("restPick").addEventListener("click", () => openSheet(
+    "Rest timer", "Starts when you tick a working set. Warm-ups don't start it.",
+    REST_OPTIONS.map((v) => ({ v, label: restLabel(v), on: v === restSecs })), 4,
+    (v) => { restSecs = Number(v); restSave(); restRender(); }
+  ));
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) { keepAwake(); restLoop(); } });
+  restRender();
+  if (restEnd !== null) restTimer = setInterval(restLoop, 250);
 
   // ── Boot ────────────────────────────────────────────────────────────────────
   loadReference().then(() => {
