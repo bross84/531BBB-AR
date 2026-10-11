@@ -44,7 +44,7 @@
     .ex-title { font-size: 17px; font-weight: 500; margin: 0 0 2px; }
     .last { font-size: 13px; color: var(--muted); margin: 0 0 8px; }
     .cols, .set { display: grid; grid-template-columns: 38px 1fr 1fr 66px 42px; gap: 4px; align-items: center; }
-    .cols { font-size: 11px; color: var(--muted); text-align: center; margin: 0 0 2px; }
+    .cols { font-size: 11px; color: var(--muted); text-align: center; margin: 0 0 2px; padding: 0 3px; }   /* the same side inset as a set row, so the labels sit over their boxes */
     .set { margin: 0 0 4px; padding: 2px 2px 15px; border-radius: 10px; border: 1px solid transparent; }
     .set.done { background: var(--done); border-color: var(--done-line); }
     .set input, .set select { width: 100%; text-align: center; padding: 6px 2px; }
@@ -65,7 +65,7 @@
     .tile .pctin { width: 34px; min-height: 0; height: 20px; padding: 0 2px; font-size: 11px; text-align: center; border-radius: 6px; background: var(--bg); }
     .stepline { display: block; margin: 4px 0 0; }
     .stepline select { min-height: 0; padding: 2px 4px; font-size: 13px; }
-    .pill { align-self: center; padding: 8px 12px; min-height: 40px; border-radius: 20px; font-size: 13px; color: var(--muted); }
+    .pill { align-self: stretch; display: flex; align-items: center; justify-content: center; padding: 8px 12px; min-height: 40px; border-radius: 12px; font-size: 13px; color: var(--muted); }
     .pill.on { color: var(--accent); border-color: var(--accent); }
     .set .rpebtn { width: 100%; padding: 6px 2px; text-align: center; }
     .set .rpebtn.actual { border-color: var(--accent); color: var(--accent); }
@@ -97,6 +97,13 @@
     @media (min-width: 900px) {
       main { max-width: 1000px; }
       #exercises .card { display: grid; grid-template-columns: 340px minmax(0, 1fr); column-gap: 16px; align-items: start; }
+      .exhead { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin: 0 0 8px; }
+      .exhead .ex-title, .exhead .last { margin: 0; }
+      .exleft { padding-top: 22px; }   /* lines the tiles up with the first set row, under the column labels */
+      .exright { max-width: 640px; }
+      .cols, .set { grid-template-columns: 44px 1fr 1fr 84px 56px; }
+      .set input, .set button { min-height: 48px; }
+      .exright > .row { justify-content: space-between; margin-top: 4px; }
       #addEx { display: block; max-width: 560px; margin: 12px auto 0; }
       #recent { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
       #recent .pick { margin: 0; }
@@ -588,10 +595,10 @@
 
   function renderExercise(ex) {
     const card = el("section", "card");
-    const left = el("div", "exleft"), right = el("div", "exright");   // side by side on a wide screen, stacked otherwise
-    card.append(left, right);
-    left.append(el("p", "ex-title", ex.title));
-    if (ex.last) left.append(el("p", "last", ex.last));
+    const head = el("div", "exhead"), left = el("div", "exleft"), right = el("div", "exright");   // side by side on a wide screen, stacked otherwise
+    card.append(head, left, right);
+    head.append(el("p", "ex-title", ex.title));
+    if (ex.last) head.append(el("p", "last", ex.last));
     left.append(renderRefBar(ex));
     const cols = el("div", "cols");
     for (const t of ["", "lb", "reps", "RPE", ""]) cols.append(el("span", null, t));
@@ -672,7 +679,7 @@
       draft.exercises = draft.exercises.filter((e) => e.id !== ex.id); saveDraft(); renderWorkout();
     });
     actions.append(add, del, rm);
-    left.append(actions);
+    right.append(actions);
     return card;
   }
 
