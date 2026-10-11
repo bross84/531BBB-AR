@@ -17,8 +17,9 @@ from database import get_db
 
 DEFAULT_TM_PCT = 0.95
 DEFAULT_STEP_KG = 2.5
+DEFAULT_STEP_LB = 5.0
 
-_COLUMNS = "exercise_template_id, basis, ls, tm_pct, step_kg"
+_COLUMNS = "exercise_template_id, basis, ls, tm_pct, step_kg, step_lb"
 
 
 def _row_to_ref(row) -> dict[str, Any]:
@@ -28,6 +29,7 @@ def _row_to_ref(row) -> dict[str, Any]:
         "ls": bool(row["ls"]),
         "tm_pct": row["tm_pct"],
         "step_kg": row["step_kg"],
+        "step_lb": row["step_lb"],
     }
 
 
@@ -37,20 +39,24 @@ def list_refs() -> list[dict[str, Any]]:
     return [_row_to_ref(r) for r in rows]
 
 
-def save_ref(exercise_template_id: str, basis: str, ls: bool, tm_pct: float, step_kg: float = DEFAULT_STEP_KG) -> dict[str, Any]:
+def save_ref(
+    exercise_template_id: str, basis: str, ls: bool, tm_pct: float,
+    step_kg: float = DEFAULT_STEP_KG, step_lb: float = DEFAULT_STEP_LB,
+) -> dict[str, Any]:
     with get_db() as conn:
         conn.execute(
             """
-            INSERT INTO exercise_refs (exercise_template_id, basis, ls, tm_pct, step_kg)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO exercise_refs (exercise_template_id, basis, ls, tm_pct, step_kg, step_lb)
+            VALUES (?, ?, ?, ?, ?, ?)
             ON CONFLICT(exercise_template_id) DO UPDATE SET
                 basis = excluded.basis,
                 ls = excluded.ls,
                 tm_pct = excluded.tm_pct,
                 step_kg = excluded.step_kg,
+                step_lb = excluded.step_lb,
                 updated_at = CURRENT_TIMESTAMP
             """,
-            (exercise_template_id, basis, 1 if ls else 0, tm_pct, step_kg),
+            (exercise_template_id, basis, 1 if ls else 0, tm_pct, step_kg, step_lb),
         )
         row = conn.execute(
             f"SELECT {_COLUMNS} FROM exercise_refs WHERE exercise_template_id = ?", (exercise_template_id,)

@@ -63,14 +63,36 @@ def reference_set(session: list[dict[str, Any]], pct: PctLookup) -> dict[str, An
     return best
 
 
+def previous_sets(sessions: list[list[dict[str, Any]]]) -> list[dict[str, Any]]:
+    """The sets of the most recent session, in order, for the Previous column. Sets with nothing logged are skipped."""
+    for session in sessions:
+        sets = [
+            {
+                "type": e.get("set_type") or "normal",
+                "weight_lb": weight_lb(e["weight_kg"]) if e.get("weight_kg") else None,
+                "reps": e.get("reps"),
+                "rpe": e.get("rpe"),
+            }
+            for e in session
+            if e.get("weight_kg") or e.get("reps")
+        ]
+        if sets:
+            return sets
+    return []
+
+
 def build_exercise_state(entries: list[dict[str, Any]], pct: PctLookup) -> dict[str, Any]:
-    """The movement's e1RM from its most recent session that has a usable set, or found=False."""
-    for session in sessions_newest_first(entries):
+    """The movement's e1RM from its most recent session that has a usable set (or found=False), plus the sets
+    of the most recent session of any kind."""
+    sessions = sessions_newest_first(entries)
+    previous = previous_sets(sessions)
+    for session in sessions:
         ref = reference_set(session, pct)
         if ref is None:
             continue
         entry = ref["entry"]
         return {
+            "previous": previous,
             "found": True,
             "workout_title": entry.get("workout_title"),
             "workout_start_time": entry.get("workout_start_time"),
@@ -80,6 +102,7 @@ def build_exercise_state(entries: list[dict[str, Any]], pct: PctLookup) -> dict[
             "e1rm_lb": round(ref["e1rm_lb"], 1),
         }
     return {
+        "previous": previous,
         "found": False,
         "workout_title": None,
         "workout_start_time": None,

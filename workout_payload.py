@@ -5,22 +5,15 @@ No DB access, no HTTP calls, no side effects.
 Hevy's rules (docs/hevy-api.md): snake_case keys wrapped in {"workout": {...}}; set type is one of
 warmup / normal / failure / dropset; rpe is one of 6, 7, 7.5, 8, 8.5, 9, 9.5, 10 or null.
 An RPE Hevy cannot store (below 6, or 6.5) is simply left blank.
-Weights are typed in lb but loaded in kg, so they are posted as the nearest half kilo (198 lb -> 90 kg).
+Weights are entered and posted in kg, as typed (the page shows lb only as a reference).
 """
 from __future__ import annotations
 
-import math
 from datetime import datetime
 from typing import Any
 
-LB_TO_KG = 0.45359237  # exact definition; matches how Hevy converts the lb the user types
 SET_TYPES = ("warmup", "normal", "failure", "dropset")
 HEVY_RPE_VALUES = (6.0, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0)
-
-
-def lb_to_plate_kg(lb: float) -> float:
-    """The kg actually on the bar for a weight typed in lb: the nearest half kilo."""
-    return math.floor(lb * LB_TO_KG * 2 + 0.5) / 2
 
 
 def _parse_time(value: str) -> datetime:
@@ -57,8 +50,8 @@ def build_hevy_workout(entry: dict[str, Any]) -> dict[str, Any]:
             if set_type not in SET_TYPES:
                 raise ValueError(f"{name} set {number}: unknown set type {set_type!r}.")
 
-            weight_lb = raw_set.get("weight_lb")
-            if weight_lb is not None and weight_lb < 0:
+            weight_kg = raw_set.get("weight_kg")
+            if weight_kg is not None and weight_kg < 0:
                 raise ValueError(f"{name} set {number}: weight can't be negative.")
             reps = raw_set.get("reps")
             if reps is not None and reps < 0:
@@ -73,7 +66,7 @@ def build_hevy_workout(entry: dict[str, Any]) -> dict[str, Any]:
             sets.append(
                 {
                     "type": set_type,
-                    "weight_kg": lb_to_plate_kg(weight_lb) if weight_lb is not None else None,
+                    "weight_kg": round(float(weight_kg), 2) if weight_kg is not None else None,
                     "reps": reps,
                     "rpe": float(rpe) if rpe is not None else None,
                 }

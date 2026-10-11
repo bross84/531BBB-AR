@@ -30,6 +30,7 @@ The gym is the garage on the home network, so none of this blocks use there.
 - The e1RM from the last session now uses the best set (highest e1RM), not the heaviest; today's best set already did (2026-10-08).
 - Rounding step per movement: `step_kg` is stored per movement (default 2.5 kg) and planned weights round to it, so micro-loaded lifts like weighted pull-ups can use 0.5 kg (2026-10-08).
 - The TS: the toggle in front of each set cycles set, warm-up, TS, failure, drop set. A TS set sets the movement's TM (its e1RM x the TM %) when the workout is saved to Hevy, and the TM holds until the next TS is saved. Every TS is kept in `training_max_history`. Until a movement has a TS, the TM falls back to the last session's best set. A block feature that picks the TS by itself is still to come (2026-10-09).
+- Weights are entered and posted in kg, with the lb beside them as a reference; a kg/lb switch in the header flips which one you type in (for a commercial gym), each movement has a rounding step in both units, and a Previous column shows what you did on each set last time (2026-10-11).
 - Tests run on GitHub for every push and pull request.
 - Removed the old Hevy write-back from the legacy session route and `HevyClient.post_workout` (2026-10-08).
 - Removed the unused `HEVY_API_KEY` variable and its CasaOS entry from `docker-compose.yml` (2026-10-08).

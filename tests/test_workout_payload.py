@@ -4,7 +4,7 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from workout_payload import build_hevy_workout, lb_to_plate_kg
+from workout_payload import build_hevy_workout
 
 
 def _entry(**overrides):
@@ -17,9 +17,9 @@ def _entry(**overrides):
                 "exercise_template_id": "tpl-squat",
                 "title": "Squat, Low Bar w/ Belt",
                 "sets": [
-                    {"type": "warmup", "weight_lb": 110, "reps": 5, "rpe": None},
-                    {"type": "normal", "weight_lb": 265, "reps": 5, "rpe": 6},
-                    {"type": "normal", "weight_lb": 281, "reps": 5, "rpe": 7},
+                    {"type": "warmup", "weight_kg": 50, "reps": 5, "rpe": None},
+                    {"type": "normal", "weight_kg": 120, "reps": 5, "rpe": 6},
+                    {"type": "normal", "weight_kg": 127.5, "reps": 5, "rpe": 7},
                 ],
             }
         ],
@@ -28,17 +28,20 @@ def _entry(**overrides):
     return base
 
 
-class TestConversion(unittest.TestCase):
+class TestWeight(unittest.TestCase):
 
-    def test_plate_kg_is_the_nearest_half_kilo(self):
-        self.assertEqual(90.0, lb_to_plate_kg(198))   # 90 kg loaded, 198 lb typed
-        self.assertEqual(120.0, lb_to_plate_kg(265))
-        self.assertEqual(0, lb_to_plate_kg(0))
+    def _kg(self, typed):
+        entry = _entry(exercises=[{"exercise_template_id": "t", "sets": [{"weight_kg": typed, "reps": 5}]}])
+        return build_hevy_workout(entry)["workout"]["exercises"][0]["sets"][0]["weight_kg"]
 
-    def test_plate_kg_keeps_the_weighted_pullup_microloading_steps_apart(self):
-        # kg loaded -> lb typed (rounded to 0.1), from the user's weighted pull-up log
-        for kg, lb in ((5.0, 11), (7.5, 16.5), (12.5, 27.6), (5.5, 12.1), (8.0, 17.6), (13.0, 28.7)):
-            self.assertEqual(kg, lb_to_plate_kg(lb), f"{lb} lb")
+    def test_the_kg_you_enter_is_posted_as_it_is(self):
+        # every step the app can plan: 0.5 kg for micro-loaded lifts up to 5 kg
+        for kg in (0.5, 1, 1.25, 2.5, 5, 46.25, 47.5, 100, 0):
+            self.assertEqual(float(kg), self._kg(kg), kg)
+
+    def test_extra_decimals_are_trimmed_to_two(self):
+        self.assertEqual(46.25, self._kg(46.2500001))
+        self.assertEqual(47.5, self._kg(47.499))
 
 
 class TestBody(unittest.TestCase):
@@ -64,7 +67,7 @@ class TestBody(unittest.TestCase):
         )
 
     def test_bodyweight_set_has_null_weight(self):
-        entry = _entry(exercises=[{"exercise_template_id": "t", "sets": [{"weight_lb": None, "reps": 8}]}])
+        entry = _entry(exercises=[{"exercise_template_id": "t", "sets": [{"weight_kg": None, "reps": 8}]}])
         s = build_hevy_workout(entry)["workout"]["exercises"][0]["sets"][0]
         self.assertIsNone(s["weight_kg"])
         self.assertEqual("normal", s["type"])
@@ -90,14 +93,14 @@ class TestRpe(unittest.TestCase):
 
     def test_every_hevy_rpe_value_is_kept(self):
         for rpe in (6, 7, 7.5, 8, 8.5, 9, 9.5, 10):
-            entry = _entry(exercises=[{"exercise_template_id": "t", "sets": [{"weight_lb": 100, "reps": 5, "rpe": rpe}]}])
+            entry = _entry(exercises=[{"exercise_template_id": "t", "sets": [{"weight_kg": 45, "reps": 5, "rpe": rpe}]}])
             body = build_hevy_workout(entry)
             self.assertEqual(float(rpe), body["workout"]["exercises"][0]["sets"][0]["rpe"])
 
     def test_rpe_hevy_cannot_store_leaves_the_field_blank_with_no_note(self):
         entry = _entry(
             exercises=[
-                {"exercise_template_id": "t", "title": "Squat", "sets": [{"weight_lb": 100, "reps": 8, "rpe": 5}]}
+                {"exercise_template_id": "t", "title": "Squat", "sets": [{"weight_kg": 45, "reps": 8, "rpe": 5}]}
             ]
         )
         exercise = build_hevy_workout(entry)["workout"]["exercises"][0]
@@ -112,10 +115,10 @@ class TestRpe(unittest.TestCase):
                     "title": "Squat",
                     "notes": "belt on",
                     "sets": [
-                        {"type": "warmup", "weight_lb": 100, "reps": 5, "rpe": 4},
-                        {"type": "normal", "weight_lb": 200, "reps": 5, "rpe": 5.5},
-                        {"type": "normal", "weight_lb": 220, "reps": 5, "rpe": 7},
-                        {"type": "failure", "weight_lb": 220, "reps": 3, "rpe": 6.5},
+                        {"type": "warmup", "weight_kg": 45, "reps": 5, "rpe": 4},
+                        {"type": "normal", "weight_kg": 90, "reps": 5, "rpe": 5.5},
+                        {"type": "normal", "weight_kg": 100, "reps": 5, "rpe": 7},
+                        {"type": "failure", "weight_kg": 100, "reps": 3, "rpe": 6.5},
                     ],
                 }
             ]
@@ -164,7 +167,7 @@ class TestRejections(unittest.TestCase):
             build_hevy_workout(entry)
 
     def test_negative_values(self):
-        for bad in ({"weight_lb": -5, "reps": 5}, {"weight_lb": 100, "reps": -1}):
+        for bad in ({"weight_kg": -5, "reps": 5}, {"weight_kg": 45, "reps": -1}):
             entry = _entry(exercises=[{"exercise_template_id": "t", "sets": [bad]}])
             with self.assertRaises(ValueError):
                 build_hevy_workout(entry)

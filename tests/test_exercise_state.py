@@ -116,5 +116,28 @@ class TestBuildExerciseState(unittest.TestCase):
         self.assertIsNone(build_exercise_state([], pct)["e1rm_lb"])
 
 
+class TestPreviousSets(unittest.TestCase):
+    """The Previous column: what you did on each set the last time you did the movement."""
+
+    def _plain(self, state):
+        return [(p["type"], p["weight_lb"], p["reps"], p["rpe"]) for p in state["previous"]]
+
+    def test_the_newest_sessions_sets_in_order_with_their_type(self):
+        state = build_exercise_state(SQUAT, pct)
+        self.assertEqual(
+            [("warmup", 110, 5, None), ("normal", 265, 5, 6.0), ("normal", 281, 5, 7.0), ("normal", 292, 5, 8.0)],
+            self._plain(state),
+        )
+
+    def test_a_newest_session_without_rpes_is_still_the_previous_one(self):
+        newest = [S("w9", "2026-10-07T00:00:00+00:00", "normal", 100, 10, None, "Accessory day")]
+        state = build_exercise_state(newest + SQUAT, pct)
+        self.assertEqual([("normal", 100, 10, None)], self._plain(state))
+        self.assertEqual("BS-Bridge1.3.1", state["workout_title"])   # the e1RM still comes from the session that has RPEs
+
+    def test_no_history_means_nothing_previous(self):
+        self.assertEqual([], build_exercise_state([], pct)["previous"])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -139,9 +139,9 @@ ENTRY = {
             "exercise_template_id": "tpl-squat",
             "title": "Squat, Low Bar w/ Belt",
             "sets": [
-                {"type": "warmup", "weight_lb": 110, "reps": 5},
-                {"type": "normal", "weight_lb": 265, "reps": 5, "rpe": 6},
-                {"type": "normal", "weight_lb": 281, "reps": 8, "rpe": 5},
+                {"type": "warmup", "weight_kg": 50, "reps": 5},
+                {"type": "normal", "weight_kg": 120, "reps": 5, "rpe": 6},
+                {"type": "normal", "weight_kg": 127.5, "reps": 8, "rpe": 5},
             ],
         }
     ],

@@ -155,7 +155,7 @@ def list_hevy_workouts(
 
 class EntrySet(BaseModel):
     type: Literal["warmup", "normal", "failure", "dropset"] = "normal"
-    weight_lb: float | None = Field(default=None, ge=0)
+    weight_kg: float | None = Field(default=None, ge=0)
     reps: int | None = Field(default=None, ge=0)
     rpe: float | None = Field(default=None, ge=0, le=10)
     ts: bool = False  # the set that sets this movement's TM; only takes effect once the workout is saved
@@ -197,14 +197,23 @@ class ExerciseRefInput(BaseModel):
     basis: Literal["e1rm", "tm"] = "e1rm"
     ls: bool = True  # plan the next set from the last set's e1RM (LSe1RM)
     tm_pct: float = Field(default=refs_store.DEFAULT_TM_PCT, ge=0.5, le=1.0)
-    step_kg: float = Field(default=refs_store.DEFAULT_STEP_KG, ge=0.25, le=10.0)  # plate step planned weights round to
+    step_kg: float = Field(default=refs_store.DEFAULT_STEP_KG, ge=0.25, le=10.0)  # plate step planned weights round to, in kg
+    step_lb: float = Field(default=refs_store.DEFAULT_STEP_LB, ge=0.5, le=25.0)  # the same, when you lift in lb
 
 
 class ExerciseRef(ExerciseRefInput):
     exercise_template_id: str
 
 
+class PreviousSet(BaseModel):
+    type: str
+    weight_lb: float | None = None
+    reps: int | None = None
+    rpe: float | None = None
+
+
 class ExerciseState(BaseModel):
+    previous: list[PreviousSet] = []
     found: bool
     workout_title: str | None = None
     workout_start_time: str | None = None
@@ -234,7 +243,7 @@ def list_exercise_refs():
 
 @app.put("/exercise-refs/{exercise_template_id}", response_model=ExerciseRef)
 def put_exercise_ref(exercise_template_id: str, data: ExerciseRefInput):
-    return refs_store.save_ref(exercise_template_id, data.basis, data.ls, data.tm_pct, data.step_kg)
+    return refs_store.save_ref(exercise_template_id, data.basis, data.ls, data.tm_pct, data.step_kg, data.step_lb)
 
 
 @app.get("/hevy/exercise-state/{exercise_template_id}", response_model=ExerciseState)

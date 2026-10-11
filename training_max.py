@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Any, Callable
 
 from database import get_db
-from exercise_state import e1rm_lb
+from exercise_state import LB_PER_KG, e1rm_lb
 
 PctLookup = Callable[[float, int], "float | None"]
 
@@ -32,15 +32,16 @@ def ts_rows_from_entry(entry: dict[str, Any], pct: PctLookup) -> list[dict[str, 
         s = marked[0]
         if s.get("type") == "warmup":
             raise ValueError(f"{name}: a warm-up can't be the TS.")
-        weight, reps, rpe = s.get("weight_lb"), s.get("reps"), s.get("rpe")
-        if not weight or not reps or rpe is None:
+        kg, reps, rpe = s.get("weight_kg"), s.get("reps"), s.get("rpe")
+        if not kg or not reps or rpe is None:
             raise ValueError(f"{name}: the TS set needs a weight, reps and an RPE.")
-        e1rm = e1rm_lb(float(weight), int(reps), float(rpe), pct)
+        weight = float(kg) * LB_PER_KG   # the e1RM sheet works in lb
+        e1rm = e1rm_lb(weight, int(reps), float(rpe), pct)
         if e1rm is None:
             raise ValueError(f"{name}: the RPE table has no value for the TS set ({reps} reps at RPE {rpe}).")
         rows.append({
             "exercise_template_id": template_id,
-            "weight_lb": float(weight),
+            "weight_lb": round(weight, 1),
             "reps": int(reps),
             "rpe": float(rpe),
             "e1rm_lb": round(e1rm, 1),

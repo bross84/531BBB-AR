@@ -38,7 +38,8 @@ def entry(*sets, template="tpl-squat", start="2026-10-09T17:00:00Z"):
 
 
 def S(lb, reps, rpe, type="normal", ts=False):
-    return {"type": type, "weight_lb": lb, "reps": reps, "rpe": rpe, "ts": ts}
+    # the page sends kg; the tests think in the lb the e1RM sheet uses
+    return {"type": type, "weight_kg": None if lb is None else lb / 2.20462, "reps": reps, "rpe": rpe, "ts": ts}
 
 
 class TestTsRowsFromEntry(unittest.TestCase):
