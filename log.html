@@ -48,6 +48,8 @@
     .ex-title { font-size: 17px; font-weight: 500; margin: 0 0 2px; }
     .exhead { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 10px; }
     .exhead .ex-title { margin: 0; order: 1; flex: 1 1 auto; }
+    .grip { order: 0; width: 28px; min-height: 36px; padding: 0; border: 0; background: transparent; color: var(--muted); font-size: 18px; line-height: 1; cursor: grab; touch-action: none; }   /* touch-action: none so a drag on the handle never scrolls the page */
+    .card.lifted { position: relative; z-index: 5; box-shadow: 0 8px 24px rgba(0,0,0,.35); opacity: .96; }
     .chip { order: 3; min-height: 32px; padding: 3px 12px; border-radius: 16px; font-size: 13px; color: var(--muted); }
     .more { order: 2; margin-left: auto; width: 36px; min-height: 36px; padding: 0; font-size: 20px; line-height: 1; color: var(--muted); }
     .cols, .set { display: grid; grid-template-columns: 24px 66px 1fr 38px 1fr 42px 28px; gap: 3px; align-items: center; }
@@ -795,6 +797,56 @@
     del.addEventListener("click", onDelete);
   }
 
+  // Drag an exercise card by its grip to change the order. The card follows the finger and the others shuffle live;
+  // on release the new order is saved to the draft (and so is the order the exercises go to Hevy in).
+  function makeReorderable(card, grip, ex) {
+    let id = null, grab = 0, edge = 0, lastY = 0, raf = 0;
+    const place = () => {
+      card.style.transform = "";
+      const top = card.getBoundingClientRect().top;
+      card.style.transform = "translateY(" + (lastY - grab - top) + "px)";
+    };
+    const step = () => {   // swap with a neighbour once the card's centre passes the neighbour's centre
+      place();
+      const r = card.getBoundingClientRect(), mid = r.top + r.height / 2;
+      const prev = card.previousElementSibling, next = card.nextElementSibling;
+      const mid_of = (n) => { const b = n.getBoundingClientRect(); return b.top + b.height / 2; };
+      if (prev && mid < mid_of(prev)) { prev.before(card); place(); }
+      else if (next && mid > mid_of(next)) { next.after(card); place(); }
+    };
+    const tick = () => {   // scroll the page while the card is held near the top or bottom edge
+      raf = 0;
+      if (id === null) return;
+      const h = window.innerHeight;
+      edge = lastY < 80 ? -12 : lastY > h - 80 ? 12 : 0;
+      if (edge) { window.scrollBy(0, edge); step(); raf = requestAnimationFrame(tick); }
+    };
+    grip.addEventListener("pointerdown", (e) => {
+      if (id !== null || (e.pointerType === "mouse" && e.button !== 0)) return;
+      id = e.pointerId; lastY = e.clientY; grab = e.clientY - card.getBoundingClientRect().top;
+      try { grip.setPointerCapture(id); } catch (err) { /* not every pointer can be captured */ }
+      card.classList.add("lifted");
+      e.preventDefault();
+    });
+    grip.addEventListener("pointermove", (e) => {
+      if (e.pointerId !== id) return;
+      lastY = e.clientY; step();
+      if (!raf) raf = requestAnimationFrame(tick);
+    });
+    const end = (e) => {
+      if (e.pointerId !== id) return;
+      id = null; cancelAnimationFrame(raf); raf = 0;
+      card.style.transform = ""; card.classList.remove("lifted");
+      const order = [...$("exercises").children].map((c) => [...cardEls].find(([, el2]) => el2 === c)[0]);
+      const byId = new Map(draft.exercises.map((x) => [x.id, x]));
+      const next = order.map((k) => byId.get(k));
+      if (next.every((x, i) => x === draft.exercises[i])) return;   // dropped where it started
+      draft.exercises = next; saveDraft();
+    };
+    grip.addEventListener("pointerup", end);
+    grip.addEventListener("pointercancel", end);
+  }
+
   // Warm-up sets, only when you ask for them: last session's warm-ups (the same share of the first working weight
   // and the same reps), or a standard ladder when there were none, such as a new movement.
   const WARMUP_LADDER = [[0.40, 8], [0.55, 5], [0.70, 3], [0.85, 1]];
@@ -829,7 +881,10 @@
     const card = el("section", "card");
     const head = el("div", "exhead"), left = el("div", "exleft"), right = el("div", "exright");   // side by side on a wide screen, stacked otherwise
     card.append(head, left, right);
-    head.append(el("p", "ex-title", ex.title));
+    const grip = el("button", "grip", "⠿");
+    grip.type = "button"; grip.setAttribute("aria-label", "Drag to reorder " + ex.title);
+    makeReorderable(card, grip, ex);
+    head.append(grip, el("p", "ex-title", ex.title));
     const chip = el("button", "chip", "Round to " + trim(stepOf(ex.ref)) + " " + unit + " ▾");
     chip.type = "button"; chip.setAttribute("aria-label", "Round planned weights to this many " + unit);
     chip.addEventListener("click", () => {
