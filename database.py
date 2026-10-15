@@ -154,6 +154,24 @@ def init_db() -> None:
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
             );
 
+            CREATE TABLE IF NOT EXISTS logged_sets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                hevy_workout_id TEXT,
+                workout_title TEXT,
+                workout_start TEXT NOT NULL,
+                workout_end TEXT,
+                exercise_template_id TEXT NOT NULL,
+                exercise_title TEXT,
+                set_number INTEGER NOT NULL,
+                set_type TEXT NOT NULL,
+                weight_kg REAL,
+                reps INTEGER,
+                rpe REAL,
+                is_ts INTEGER NOT NULL DEFAULT 0,
+                recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_logged_sets_exercise ON logged_sets (exercise_template_id, workout_start);
+
             CREATE TABLE IF NOT EXISTS body_measurements (
                 date TEXT PRIMARY KEY,
                 weight_kg REAL NOT NULL,

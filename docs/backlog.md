@@ -6,7 +6,8 @@ Things we've decided to do later. One feature at a time: pick the one that matte
 
 - **Parked: keep noisy sets out of the e1RM.** The e1RM is the highest e1RM across the sets, so one inflated set wins (the RPE table has to guess the reps left on a low-RPE set, e.g. an 8 @5 gives about 13 reps to failure). Decided 2026-10-08 to leave it until the e1RM is used to load weights; once the TS sets the TM it is only a metric. Preferred rule when it comes back: a set counts only if its RPE is 7 or higher (one constant in `exercise_state.py` and `log.html`; the last-set feature stays exempt). On the 19 Sep squat session that gives 332 (292 x 3 @8) instead of 343 (265 x 5 @6), the more trustworthy figure. Rejected: a rep cap (it would drop a real 9 @9.5 AMRAP) and a set-to-set window (it needs peer sets, so it can't judge a lone set, and a ramping session can mislead it). Bring it back if the e1RM tile looks too high.
 - **Our own number pad instead of the on-screen keyboard.** In landscape the system keyboard covers about half the screen. A compact pad in the page (digits, a decimal point, Next and Done) would be about a third of the height. The inputs would use `inputmode="none"` so the system keyboard stays away, and the pad would dock at the bottom and move between the weight, reps and RPE boxes. Decided 2026-10-11 to do it later; for now the page hides the bottom bar while you type and scrolls the box above the keyboard. *(Asked about 2026-10-11: future.)*
-- **Keep our own record of sets.** Hevy cannot store RPE below 6 or 6.5 (it is simply left blank when posting). A local log would keep every RPE as a number so history can use it.
+- **Per-lift RPE charts, alongside the current one.** Decided 2026-10-15. Each lift gets an optional chart of its own, starting as a copy of the current one, with a setting per lift for which chart it uses (the current one stays the default). Then a read-only report of how your sets compare with the chart, and finally suggested corrections you approve. Anchors: the daily 1@8 (marked as the TS), AMRAPs and RPE 10 sets. Build in that order, one at a time.
+- **The marked TS sets the TM at once.** Today a TS only sets the TM when the workout is saved, so a 1@8 done first doesn't change that session's planned weights (the e1RM basis does follow it). Make the TM tile use today's marked TS straight away.
 
 ## Nice to have
 
@@ -25,6 +26,8 @@ The gym is the garage on the home network, so none of this blocks use there.
 - **Parked design work:** `docs/notation-spec.md` (program notation, TM/e1RM rules). Not being built now.
 
 ## Done recently
+
+- Our own record of sets (2026-10-15): every set of a workout saved to Hevy is also kept in the `logged_sets` table with the RPE as typed (Hevy drops anything below 6 or 6.5), the set type, whether it was the TS, and the Hevy workout id. Only starts from the day it was deployed; Hevy history is not backfilled yet.
 
 - Renamed the project to Rackbook (2026-10-15): page titles, docs, container, volume (`rackbook-data`) and database file (`rackbook.db`). `plan.md` is a history log and keeps the old name.
 

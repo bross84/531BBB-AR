@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 from collections import defaultdict
 from contextlib import asynccontextmanager
@@ -14,6 +15,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+logger = logging.getLogger(__name__)
+
 from database import get_db, get_rpe_percentage, init_db
 import body_weight
 import hevy_client
@@ -21,6 +24,7 @@ import exercise_state
 import program_parser
 import progress
 import refs_store
+import set_log
 import training_max
 from wave_math import bbb_weight, epley, joker_qualifies, joker_weight, round_weight, session_e1rm, working_weight
 from workout_payload import build_hevy_workout
@@ -275,6 +279,11 @@ def create_hevy_workout(entry: WorkoutEntry):
         raise HTTPException(status_code=422, detail=str(exc))
     created = _call_hevy(lambda client: client.create_workout(body))
     training_max.record(ts_rows, entry.start_time)  # only once Hevy has the workout
+    try:
+        set_log.record(set_log.rows_from_entry(entry.model_dump(), created.get("id")))
+    except Exception:
+        # Hevy already has the workout; failing here would make a retry post it twice
+        logger.exception("Could not record the sets of workout %s locally", created.get("id"))
     return {"id": created.get("id")}
 
 
