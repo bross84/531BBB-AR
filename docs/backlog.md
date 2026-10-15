@@ -22,10 +22,11 @@ The gym is the garage on the home network, so none of this blocks use there.
 
 ## Tidy-ups
 
-- **Rename the project** (still 531 BBB-AR in the name, docs, container and database file) once the direction settles.
 - **Parked design work:** `docs/notation-spec.md` (program notation, TM/e1RM rules). Not being built now.
 
 ## Done recently
+
+- Renamed the project to Rackbook (2026-10-15): page titles, docs, container, volume (`rackbook-data`) and database file (`rackbook.db`). `plan.md` is a history log and keeps the old name.
 
 - Recent workouts page, workout entry page, own RPE table, per-movement auto weight, kg conversion, picker with recent first, current e1RM from today's best set (2026-10-08).
 - The e1RM from the last session now uses the best set (highest e1RM), not the heaviest; today's best set already did (2026-10-08).

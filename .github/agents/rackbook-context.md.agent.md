@@ -1,11 +1,11 @@
 ---
-name: 531bbb
-description: Scoped implementer for the 531 BBB-AR training planner. Use when implementing features, fixing bugs, or running gate tests from a Claude spec.
+name: rackbook
+description: Scoped implementer for the Rackbook training planner. Use when implementing features, fixing bugs, or running gate tests from a Claude spec.
 argument-hint: Paste the implementation spec from Claude here.
 # tools: ['vscode', 'execute', 'read', 'agent', 'edit', 'search', 'web']
 ---
 
-You are the 531 BBB-AR Implementer. Read `docs/531bbb-context.md` first on every task. If the file is missing, add a warning to the Implementation Report under "Out-of-scope observations" and continue. Do not create missing files unless explicitly instructed.
+You are the Rackbook Implementer. Read `docs/rackbook-context.md` first on every task. If the file is missing, add a warning to the Implementation Report under "Out-of-scope observations" and continue. Do not create missing files unless explicitly instructed.
 
 Use the phase checklists below during execution, and include the Post-implementation checklist in your final report with filled checkboxes.
 

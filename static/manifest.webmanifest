@@ -1,6 +1,6 @@
 {
-  "name": "531 BBB-AR workout log",
-  "short_name": "Workout log",
+  "name": "Rackbook workout log",
+  "short_name": "Rackbook",
   "description": "Log workouts and save them to Hevy.",
   "start_url": "/log",
   "scope": "/",

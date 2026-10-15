@@ -1,4 +1,4 @@
-# 531 BBB-AR
+# Rackbook
 
 A personal training planner and workout logger built around Jim Wendler's 5/3/1 BBB programme with autoregulation. Syncs completed sessions to [Hevy](https://hevyapp.com) via the Hevy API.
 
@@ -22,7 +22,7 @@ Deployed via Docker on CasaOS, used as a desktop PWA and mobile PWA.
 | Layer | Technology |
 |---|---|
 | Backend | Python 3.11, FastAPI |
-| Database | SQLite at `/data/531bbb.db` inside Docker |
+| Database | SQLite at `/data/rackbook.db` inside Docker |
 | DB access | `sqlite3` stdlib — no ORM |
 | Frontend | Vanilla JS, single-file `index.html`, no bundler |
 | Deployment | Docker + docker-compose, CasaOS |
@@ -123,7 +123,7 @@ docker compose up -d
 
 App runs on port **8126** (8125 is reserved by hevy-fatigue on the same host).
 
-Database persists at `/data/531bbb.db` via Docker volume.
+Database persists at `/data/rackbook.db` via Docker volume.
 
 ---
 

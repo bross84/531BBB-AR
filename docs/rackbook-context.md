@@ -1,4 +1,4 @@
-# 531 BBB-AR — Project Context
+# Rackbook — Project Context
 
 Source of truth for architecture, schema, wave math rules, and constraints.  
 Read this file at the start of every task. Do not proceed if it is missing.
@@ -10,7 +10,7 @@ Read this file at the start of every task. Do not proceed if it is missing.
 | Layer | Technology |
 |---|---|
 | Backend | Python 3.11, FastAPI |
-| Database | SQLite at `/data/531bbb.db` inside Docker — `sqlite3` stdlib, no ORM |
+| Database | SQLite at `/data/rackbook.db` inside Docker — `sqlite3` stdlib, no ORM |
 | Frontend | Vanilla JS, single `index.html` — all HTML, CSS, JS in one file, no bundler |
 | HTTP client | `httpx` (async) for Hevy API calls |
 | Deployment | Docker + docker-compose on CasaOS homelab |
@@ -309,7 +309,7 @@ docker compose down -v
 
 **View logs:**
 ```
-docker logs 531bbb -f
+docker logs rackbook -f
 ```
 
 **Health check:**
@@ -317,4 +317,4 @@ docker logs 531bbb -f
 curl http://localhost:8126/health
 ```
 
-The SQLite DB is stored in the named volume `531bbb-ar_531bbb-data` at `/data/531bbb.db` inside the container. The Fernet key is at `/data/app.key`. Both persist across `stop`/`start` cycles. Only `down -v` wipes them.
+The SQLite DB is stored in the named volume `rackbook_rackbook-data` at `/data/rackbook.db` inside the container. The Fernet key is at `/data/app.key`. Both persist across `stop`/`start` cycles. Only `down -v` wipes them.

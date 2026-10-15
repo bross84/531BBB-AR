@@ -1,5 +1,5 @@
 """
-program_parser.py — Pure parser for 531 BBB-AR program notation text.
+program_parser.py — Pure parser for Rackbook program notation text.
 No DB access, no HTTP calls, no side effects.
 """
 from __future__ import annotations

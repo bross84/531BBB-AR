@@ -1,14 +1,14 @@
 services:
-  531bbb:
+  rackbook:
     build: .
-    container_name: 531bbb
+    container_name: rackbook
     restart: unless-stopped
     ports:
       - "8126:8126"
     volumes:
-      - 531bbb-data:/data
+      - rackbook-data:/data
     environment:
-      - DB_PATH=/data/531bbb.db
+      - DB_PATH=/data/rackbook.db
     x-casaos:
       envs:
         - container: DB_PATH
@@ -16,5 +16,5 @@ services:
             en_us: SQLite database path
 
 volumes:
-  531bbb-data:
+  rackbook-data:
     driver: local

@@ -36,7 +36,7 @@ class TestFrontDoor(unittest.TestCase):
     def test_original_app_is_still_served_at_legacy(self):
         r = self.client.get("/legacy")
         self.assertEqual(200, r.status_code)
-        self.assertIn("531 BBB-AR", r.text)
+        self.assertIn("Rackbook", r.text)
 
     def test_recent_page_links_to_the_log_page_and_back(self):
         self.assertIn('href="/log"', self.client.get("/recent").text)

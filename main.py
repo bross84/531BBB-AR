@@ -33,7 +33,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="531 BBB-AR", lifespan=lifespan)
+app = FastAPI(title="Rackbook", lifespan=lifespan)
 
 # Pages change whenever the app is rebuilt, so browsers must re-check them instead of reusing a stored copy.
 NO_CACHE = {"Cache-Control": "no-cache"}
