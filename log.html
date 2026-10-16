@@ -1013,6 +1013,13 @@
         applyAuto(ex); saveDraft();
         const rest = restFor(ex);
         if (s.done && s.type !== "warmup" && rest > 0) restStart(rest);   // the rest timer, this movement's own time; warm-ups don't start it
+        // A ticked warm-up is dropped from the workout (so it is not saved to Hevy either) after a moment, so a mis-tap can be undone.
+        // Only its row goes, not a redraw, so a box you have started typing in keeps its keyboard.
+        if (s.done && s.type === "warmup") setTimeout(() => {
+          const i = ex.sets.indexOf(s);
+          if (!s.done || i < 0) return;
+          ex.sets.splice(i, 1); saveDraft(); if (openSwipe === wrap) openSwipe = null; wrap.remove();
+        }, 800);
       });
 
       row.append(kind, prevCell, wt, refCell, reps, rpe, e1Cell, tick);
