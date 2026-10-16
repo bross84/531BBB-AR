@@ -27,6 +27,7 @@ The gym is the garage on the home network, so none of this blocks use there.
 
 ## Done recently
 
+- RPE tables page (2026-10-16), `/rpe-charts`: for each lift, a grid of RPE by reps filled in from your own logged sets, as a share of the lift's newest TS e1RM, next to the table in use (cell colour and gap show how far off it is, n shows how many sets it rests on). Read-only; the per-lift charts to edit and switch between are still to come. Warm-ups, drop sets and the TS itself are left out.
 - The TS pins the e1RM (2026-10-16): a set marked TS and ticked done, or else the latest saved TS, is the movement's e1RM (tile marked "TS"), and no other set outranks it, however high its own e1RM comes out. Only a movement with no TS mixes in its best set. The TM still changes only when the workout is saved. Open point: once a movement has a saved TS there is no way back to the best-set e1RM short of clearing its TS history.
 - Rest time per exercise and a much louder alarm (2026-10-16): each exercise has its own rest time (a chip on its card, stored per movement in `exercise_refs.rest_sec`), the bar picker is now the default for exercises without one, and the end-of-rest alarm is square waves at full volume for about 3 seconds.
 - Our own record of sets (2026-10-15): every set of a workout saved to Hevy is also kept in the `logged_sets` table with the RPE as typed (Hevy drops anything below 6 or 6.5), the set type, whether it was the TS, and the Hevy workout id. Only starts from the day it was deployed; Hevy history is not backfilled yet.

@@ -24,6 +24,7 @@ import exercise_state
 import program_parser
 import progress
 import refs_store
+import rpe_observed
 import set_log
 import training_max
 from wave_math import bbb_weight, epley, joker_qualifies, joker_weight, round_weight, session_e1rm, working_weight
@@ -244,6 +245,51 @@ def get_rpe_table():
     with get_db() as conn:
         rows = conn.execute("SELECT rpe, reps, percentage FROM rpe_chart ORDER BY rpe DESC, reps").fetchall()
     return {"rows": [[r["rpe"], r["reps"], r["percentage"]] for r in rows]}
+
+
+class ObservedLift(BaseModel):
+    exercise_template_id: str
+    title: str | None = None
+    sets: int  # working sets logged with an RPE
+    sessions: int
+
+
+class ObservedCell(BaseModel):
+    rpe: float
+    reps: int
+    n: int  # sets averaged into this cell
+    observed: float  # fraction of the anchor e1RM
+    chart: float | None = None  # what the RPE table in use says for the same RPE and reps
+
+
+class ObservedTable(BaseModel):
+    exercise_template_id: str
+    title: str | None = None
+    anchor_e1rm_lb: float | None = None  # the newest TS's e1RM
+    anchor_set_at: str | None = None
+    sets_used: int
+    sets_without_anchor: int  # logged before the movement's first TS, so no anchor to measure against
+    cells: list[ObservedCell]
+
+
+@app.get("/rpe-charts")
+def rpe_charts_page():
+    return FileResponse("rpe_charts.html", headers=NO_CACHE)
+
+
+@app.get("/rpe-observed", response_model=list[ObservedLift])
+def list_observed_lifts():
+    """The movements with logged sets to build an RPE table from."""
+    return set_log.lifts_with_rpe()
+
+
+@app.get("/rpe-observed/{exercise_template_id}", response_model=ObservedTable)
+def get_observed_table(exercise_template_id: str):
+    """The RPE table your own sets of this movement describe so far, next to the table in use."""
+    sets = set_log.for_exercise(exercise_template_id)
+    built = rpe_observed.build_observed(sets, training_max.history(exercise_template_id), get_rpe_percentage)
+    title = next((s["exercise_title"] for s in sets if s["exercise_title"]), None)
+    return {"exercise_template_id": exercise_template_id, "title": title, **built}
 
 
 @app.get("/exercise-refs", response_model=list[ExerciseRef])

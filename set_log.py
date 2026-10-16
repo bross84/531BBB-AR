@@ -52,6 +52,22 @@ def record(rows: list[dict[str, Any]]) -> None:
         )
 
 
+def lifts_with_rpe() -> list[dict[str, Any]]:
+    """The movements that have working sets logged with an RPE, most sets first."""
+    with get_db() as conn:
+        rows = conn.execute(
+            """
+            SELECT exercise_template_id, MAX(exercise_title) AS title, COUNT(*) AS sets,
+                   COUNT(DISTINCT workout_start) AS sessions
+            FROM logged_sets
+            WHERE set_type NOT IN ('warmup', 'dropset') AND rpe IS NOT NULL
+            GROUP BY exercise_template_id
+            ORDER BY sets DESC, title
+            """
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
 def for_exercise(exercise_template_id: str) -> list[dict[str, Any]]:
     """Every recorded set of one movement, oldest first."""
     with get_db() as conn:

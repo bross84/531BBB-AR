@@ -63,6 +63,21 @@ def record(rows: list[dict[str, Any]], set_at: str) -> None:
         )
 
 
+def history(exercise_template_id: str) -> list[dict[str, Any]]:
+    """Every TS the movement has had, oldest first."""
+    with get_db() as conn:
+        rows = conn.execute(
+            """
+            SELECT e1rm_lb, weight_lb, reps, rpe, set_at
+            FROM training_max_history
+            WHERE exercise_template_id = ?
+            ORDER BY set_at, id
+            """,
+            (exercise_template_id,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
 def latest(exercise_template_id: str) -> dict[str, Any]:
     """The movement's current TS (the one from the newest workout), or found=False."""
     with get_db() as conn:
