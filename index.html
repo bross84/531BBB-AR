@@ -603,8 +603,10 @@
         ...options
       });
 
+      // a 204 (such as saving the API key) can carry a JSON content type with no body at all
       const hasJson = response.headers.get("content-type")?.includes("application/json");
-      const body = hasJson ? await response.json() : null;
+      const text = hasJson ? await response.text() : "";
+      const body = text ? JSON.parse(text) : null;
 
       if (!response.ok) {
         const rawDetail = body?.detail;
