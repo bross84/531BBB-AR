@@ -50,10 +50,19 @@
     td.near { background: var(--near-bg); }
     td.off { background: var(--off-bg); }
     td.far { background: var(--far-bg); }
+    td.anchor { background: transparent; border: 1.5px solid var(--accent); }
+    td.anchor .s { color: var(--accent); font-weight: 500; }
     td.blank { background: transparent; border: 0; }
     .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin: 10px 0 0; }
     .legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; border: 1px solid var(--line); }
     .note { font-size: 13px; color: var(--muted); margin: 8px 0 0; }
+    .fit h2 { font-size: 15px; font-weight: 500; margin: 0 0 4px; }
+    .fit .big { font-size: 15px; margin: 0 0 8px; }
+    .fit .big b { font-weight: 500; }
+    .fit table { width: 100%; border-spacing: 0; }
+    .fit td, .fit th { background: none; border-radius: 0; height: auto; min-width: 0; padding: 4px 6px 4px 0; text-align: right; font-size: 14px; border-top: 1px solid var(--line); }
+    .fit th { position: static; font-size: 12px; border-top: 0; }
+    .fit td:first-child, .fit th:first-child { text-align: left; }
     .error { background: var(--danger-bg); color: var(--danger); border-radius: 10px; padding: 10px 12px; margin: 0 0 12px; }
     .empty { text-align: center; color: var(--muted); padding: 28px 8px; }
   </style>
@@ -131,6 +140,7 @@
     }
     if (!data.general && !data.nothingLogged) {
       sum.append(data.sets_used + (data.sets_used === 1 ? " set" : " sets") + " used");
+      if (data.ts_sets) sum.append(", plus " + data.ts_sets + " TS");
       if (data.sets_without_anchor) sum.append(", " + data.sets_without_anchor + " logged before the first TS");
       sum.append(".");
     }
@@ -154,11 +164,15 @@
       for (let n = 1; n <= maxReps; n++) {
         const c = cells.get(rpe + "|" + n), chart = table.get(rpe + "|" + n);
         const td = el("td");
-        if (c) {
+        if (c && c.n === 0) {   // only the TS here: the reference, so it can only agree with the table
+          td.className = "anchor";
+          td.append(el("div", "v", pct(c.observed)), el("div", "s", "TS"));
+          td.title = "Your TS: the set the other sets are measured against, so it sits at the table's value by definition.";
+        } else if (c) {
           const diff = c.chart != null ? c.observed - c.chart : 0;
           td.className = c.chart != null ? band(diff) : "";
           td.append(el("div", "v", pct(c.observed)));
-          td.append(el("div", "s", (c.chart != null ? (diff >= 0 ? "+" : "−") + (Math.abs(diff) * 100).toFixed(1) + " · " : "") + "n" + c.n));
+          td.append(el("div", "s", (c.chart != null ? (diff >= 0 ? "+" : "−") + (Math.abs(diff) * 100).toFixed(1) + " · " : "") + "n" + c.n + (c.ts ? " +TS" : "")));
           td.title = "Your sets: " + pct(c.observed) + "% of e1RM (" + c.n + (c.n === 1 ? " set" : " sets") + (c.chart != null ? "). Table in use: " + pct(c.chart) + "%." : ").");
         } else if (chart != null) {
           td.className = "none";
@@ -176,17 +190,58 @@
     card.append(scroll);
 
     const legend = el("div", "legend");
-    for (const [cls, text] of [["near", "within 1 point of the table"], ["off", "1 to 2.5 points off"], ["far", "more than 2.5 off"], ["none", "nothing logged yet (the table's value)"]]) {
+    for (const [cls, text] of [["near", "within 1 point of the table"], ["off", "1 to 2.5 points off"], ["far", "more than 2.5 off"], ["anchor", "your TS, the reference"], ["none", "nothing logged yet (the table's value)"]]) {
       const item = el("span");
       const swatch = el("i"); swatch.className = "";
-      swatch.style.background = cls === "none" ? "transparent" : "var(--" + cls + "-bg)";
+      swatch.style.background = cls === "none" || cls === "anchor" ? "transparent" : "var(--" + cls + "-bg)";
       if (cls === "none") swatch.style.borderStyle = "dashed";
+      if (cls === "anchor") swatch.style.borderColor = "var(--accent)";
       item.append(swatch, text);
       legend.append(item);
     }
     card.append(legend);
-    card.append(el("p", "note", "Each filled cell is the average of your sets at that RPE and reps, as a share of the anchor e1RM, with the gap to the table in use and how many sets it rests on (n). Higher than the table means you can do more than it says at that RPE. Warm-ups, drop sets and the TS itself are left out. A cell on one or two sets is a hint, not a result."));
+    card.append(el("p", "note", "Each filled cell is the average of your sets at that RPE and reps, as a share of the anchor e1RM, with the gap to the table in use and how many sets it rests on (n). Higher than the table means you can do more than it says at that RPE. Warm-ups and drop sets are left out. Your TS sits in its own cell as the reference and isn't averaged in. This grid measures against the TS's e1RM, which comes from the table itself, so see the fitted curve below for a view that doesn't. A cell on one or two sets is a hint, not a result."));
     view.append(card);
+    if (!data.general && !data.nothingLogged) view.append(renderFit(data.fit));
+  }
+
+  // A fit that never uses the table's numbers: only that a set is as hard as a set to failure of reps + reps-in-reserve,
+  // that the share of your max falls in a straight line with those reps, and that a true RPE 10 single is 100%.
+  function renderFit(fit) {
+    const card = el("div", "card fit");
+    card.append(el("h2", null, "Fitted curve"));
+    if (!fit) {
+      card.append(el("p", "note", "Not enough to fit yet. It needs a workout with sets at clearly different effort, such as a single and sets of five at lower RPEs."));
+      return card;
+    }
+    const slope = (fit.slope * 100).toFixed(2), tableSlope = fit.table_slope != null ? (fit.table_slope * 100).toFixed(2) : null;
+    const big = el("p", "big");
+    big.append("Your sets lose ", el("b", null, slope + " points"), " of your max per extra rep to failure");
+    if (tableSlope != null) big.append(" (the table in use: " + tableSlope + ")");
+    big.append(".");
+    card.append(big);
+
+    const t = el("table");
+    const head = el("tr");
+    for (const h of ["Workout", "Fitted e1RM", "From the TS", "Gap"]) head.append(el("th", null, h));
+    t.append(head);
+    for (const ss of fit.sessions) {
+      const row = el("tr");
+      const lb = Math.round(ss.e1rm_lb), kg = Math.round(ss.e1rm_lb / LB_PER_KG);
+      row.append(el("td", null, fmtDate(ss.workout_start)), el("td", null, lb + " lb · " + kg + " kg"));
+      if (ss.table_e1rm_lb != null) {
+        const gap = ss.e1rm_lb - ss.table_e1rm_lb;
+        row.append(el("td", null, Math.round(ss.table_e1rm_lb) + " lb"), el("td", null, (gap >= 0 ? "+" : "−") + Math.abs(Math.round(gap)) + " lb"));
+      } else {
+        row.append(el("td", null, "–"), el("td", null, "–"));
+      }
+      t.append(row);
+    }
+    card.append(t);
+    card.append(el("p", "note", "Fitted on " + fit.sets_fitted + " sets in " + fit.informative_sessions + (fit.informative_sessions === 1 ? " workout" : " workouts") + ", typically within " + (fit.rms_error * 100).toFixed(1) + "% of the line. " +
+      "\"From the TS\" is the e1RM the table gives for your TS; the gap is how much of that number is the table's own assumption. All sets count here, the TS included. " +
+      "It assumes a straight line from a true RPE 10 single at 100%, and one workout is a rough guide: the slope firms up as sessions with a spread of reps and RPEs come in."));
+    return card;
   }
 
   async function select(key) {

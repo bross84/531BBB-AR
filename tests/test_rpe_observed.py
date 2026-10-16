@@ -52,11 +52,26 @@ class TestBuildObserved(unittest.TestCase):
         self.assertEqual(2, cell["n"])
         self.assertAlmostEqual(0.79, cell["observed"], places=4)
 
-    def test_the_ts_itself_warmups_and_dropsets_are_left_out(self):
-        sets = [S(145, 1, 7.0, is_ts=1), S(60, 5, 7.0, set_type="warmup"), S(100, 5, 7.0, set_type="dropset"), S(128, 5, 7.0)]
+    def test_warmups_and_dropsets_are_left_out(self):
+        sets = [S(60, 5, 7.0, set_type="warmup"), S(100, 5, 7.0, set_type="dropset"), S(128, 5, 7.0)]
         out = rpe_observed.build_observed(sets, [ts(DAY1)], chart)
         self.assertEqual(1, out["sets_used"])
         self.assertEqual(1, len(out["cells"]))
+
+    def test_the_ts_gets_its_own_cell_but_is_not_averaged_or_counted_as_used(self):
+        # 160 kg e1RM: the 1 @7 single is the anchor, so it sits at its own share of the anchor
+        out = rpe_observed.build_observed([S(145, 1, 7.0, is_ts=1), S(128, 5, 7.0)], [ts(DAY1)], chart)
+        self.assertEqual((1, 1), (out["sets_used"], out["ts_sets"]))
+        single, five = out["cells"]
+        self.assertEqual((7.0, 1, 0, 1), (single["rpe"], single["reps"], single["n"], single["ts"]))
+        self.assertAlmostEqual(145 * LB_PER_KG / (ANCHOR_KG * LB_PER_KG), single["observed"], places=4)
+        self.assertEqual((7.0, 5, 1, 0), (five["rpe"], five["reps"], five["n"], five["ts"]))
+
+    def test_a_cell_with_the_ts_and_other_sets_averages_only_the_others(self):
+        out = rpe_observed.build_observed([S(145, 1, 7.0, is_ts=1), S(140, 1, 7.0, start=DAY1)], [ts(DAY1)], chart)
+        cell = out["cells"][0]
+        self.assertEqual((1, 1), (cell["n"], cell["ts"]))
+        self.assertAlmostEqual(140 / ANCHOR_KG, cell["observed"], places=4)   # the 140, not the mean of 140 and the TS
 
     def test_sets_missing_a_weight_reps_or_rpe_are_left_out(self):
         sets = [S(None, 5, 7.0), S(100, None, 7.0), S(100, 5, None), S(0, 5, 7.0)]
@@ -83,6 +98,53 @@ class TestBuildObserved(unittest.TestCase):
         sets = [S(100, 5, 6.5), S(100, 3, 8.0), S(100, 1, 8.0), S(100, 5, 8.0)]
         out = rpe_observed.build_observed(sets, [ts(DAY1)], chart)
         self.assertEqual([(8.0, 1), (8.0, 3), (8.0, 5), (6.5, 5)], [(c["rpe"], c["reps"]) for c in out["cells"]])
+
+
+def _synthetic(e1rm_kg, slope, shapes, start):
+    """Sets that follow f(k) = 1 - slope * (k - 1) exactly, one per (reps, rpe)."""
+    return [S(round(e1rm_kg * (1 - slope * (reps + 10 - rpe - 1)), 4), reps, rpe, start=start) for reps, rpe in shapes]
+
+
+class TestFitCurve(unittest.TestCase):
+    SHAPES = [(1, 7.0), (5, 5.0), (5, 6.5), (5, 7.5)]
+
+    def test_it_recovers_the_slope_and_each_workouts_e1rm_without_using_the_table(self):
+        sets = _synthetic(150.0, 0.03, self.SHAPES, DAY1) + _synthetic(155.0, 0.03, self.SHAPES, DAY3)
+        out = rpe_observed.fit_curve(sets, [ts(DAY1), ts(DAY3)], chart)
+        self.assertAlmostEqual(0.03, out["slope"], places=3)
+        by = {s["workout_start"]: s for s in out["sessions"]}
+        self.assertAlmostEqual(150.0 * LB_PER_KG, by[DAY1]["e1rm_lb"], delta=1.0)
+        self.assertAlmostEqual(155.0 * LB_PER_KG, by[DAY3]["e1rm_lb"], delta=1.0)
+        self.assertEqual((2, 8), (out["informative_sessions"], out["sets_fitted"]))
+        self.assertLess(out["rms_error"], 0.001)
+
+    def test_the_ts_single_counts_like_any_other_set(self):
+        sets = _synthetic(150.0, 0.03, self.SHAPES, DAY1)
+        sets[0]["is_ts"] = 1   # the 1 @7
+        self.assertEqual(4, rpe_observed.fit_curve(sets, [ts(DAY1)], chart)["sets_fitted"])
+
+    def test_a_workout_with_every_set_at_one_k_does_not_pin_the_slope_but_still_gets_an_e1rm(self):
+        same_k = _synthetic(150.0, 0.03, [(5, 7.0), (3, 5.0), (7, 9.0)], DAY1)   # k is 8 for all three
+        varied = _synthetic(150.0, 0.03, self.SHAPES, DAY3)
+        out = rpe_observed.fit_curve(same_k + varied, [], chart)
+        self.assertEqual(1, out["informative_sessions"])
+        self.assertAlmostEqual(0.03, out["slope"], places=3)
+        self.assertEqual(2, len(out["sessions"]))
+
+    def test_no_workout_with_two_different_k_means_no_fit(self):
+        self.assertIsNone(rpe_observed.fit_curve([S(128, 5, 7.0)], [], chart))
+        self.assertIsNone(rpe_observed.fit_curve([], [], chart))
+
+    def test_warmups_and_dropsets_do_not_enter_the_fit(self):
+        sets = _synthetic(150.0, 0.03, self.SHAPES, DAY1) + [S(30, 12, 3.0, set_type="warmup"), S(60, 12, 4.0, set_type="dropset")]
+        self.assertEqual(4, rpe_observed.fit_curve(sets, [ts(DAY1)], chart)["sets_fitted"])
+
+    def test_the_table_in_use_is_reported_beside_the_fit(self):
+        sets = _synthetic(150.0, 0.03, self.SHAPES, DAY1)
+        full = lambda rpe, reps: {(10.0, 2): 0.96, (10.0, 10): 0.746}.get((rpe, reps))
+        out = rpe_observed.fit_curve(sets, [ts(DAY1, 148.0)], full)
+        self.assertAlmostEqual((0.96 - 0.746) / 8, out["table_slope"])
+        self.assertAlmostEqual(148.0 * 2.20462, out["sessions"][0]["table_e1rm_lb"], places=3)
 
 
 class TestObservedRoutes(unittest.TestCase):

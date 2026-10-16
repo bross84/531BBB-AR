@@ -258,9 +258,26 @@ class ObservedLift(BaseModel):
 class ObservedCell(BaseModel):
     rpe: float
     reps: int
-    n: int  # sets averaged into this cell
+    n: int  # sets averaged into this cell, not counting the TS
+    ts: int = 0  # TS sets that sit in this cell: the reference the rest are measured with, shown but not averaged
     observed: float  # fraction of the anchor e1RM
     chart: float | None = None  # what the RPE table in use says for the same RPE and reps
+
+
+class FitSession(BaseModel):
+    workout_start: str
+    e1rm_lb: float  # the e1RM that workout's sets point to along the fitted curve
+    table_e1rm_lb: float | None = None  # the e1RM the TS gave from the table in use
+    sets: int
+
+
+class CurveFit(BaseModel):
+    slope: float  # share of the max lost per extra rep to failure, fitted
+    table_slope: float | None = None  # the same for the table in use
+    rms_error: float  # typical miss of a set against the fit, as a fraction of the max
+    informative_sessions: int  # workouts with sets at two or more different k: the ones that pin the slope
+    sets_fitted: int
+    sessions: list[FitSession]
 
 
 class ObservedTable(BaseModel):
@@ -268,9 +285,11 @@ class ObservedTable(BaseModel):
     title: str | None = None
     anchor_e1rm_lb: float | None = None  # the newest TS's e1RM
     anchor_set_at: str | None = None
-    sets_used: int
+    sets_used: int  # sets other than the TS that were measured
+    ts_sets: int = 0
     sets_without_anchor: int  # logged before the movement's first TS, so no anchor to measure against
     cells: list[ObservedCell]
+    fit: CurveFit | None = None  # a table-free fit to all the sets; None until a workout has sets at two different k
 
 
 @app.get("/rpe-charts")
@@ -289,7 +308,9 @@ def list_observed_lifts():
 def get_observed_table(exercise_template_id: str):
     """The RPE table your own sets of this movement describe so far, next to the table in use."""
     sets = set_log.for_exercise(exercise_template_id)
-    built = rpe_observed.build_observed(sets, training_max.history(exercise_template_id), get_rpe_percentage)
+    history = training_max.history(exercise_template_id)
+    built = rpe_observed.build_observed(sets, history, get_rpe_percentage)
+    built["fit"] = rpe_observed.fit_curve(sets, history, get_rpe_percentage)
     title = next((s["exercise_title"] for s in sets if s["exercise_title"]), None)
     return {"exercise_template_id": exercise_template_id, "title": title, **built}
 
