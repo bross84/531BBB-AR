@@ -410,8 +410,22 @@
     return best;
   }
 
-  // The movement's current e1RM: its best set today, until a set is done the one from the last session.
+  // The TS is the movement's e1RM and no other set outranks it, however high its own e1RM comes out: a set marked TS
+  // and ticked done in this workout, else the latest saved TS. Only a movement with no TS mixes in its best set.
+  function anchorE1rm(ex) {
+    for (const s of ex.sets) {
+      if (!s.ts || !s.done || s.type === "warmup") continue;
+      const e1 = setE1rm(s);
+      if (e1) return e1;
+    }
+    const ts = ex.ref.ts;
+    return ts && ts.found ? ts.e1rm_lb : null;
+  }
+
+  // The movement's current e1RM: its TS if it has one, else its best set today, until a set is done the one from the last session.
   function currentE1rm(ex) {
+    const anchor = anchorE1rm(ex);
+    if (anchor) return { value: anchor, best: null };
     const best = bestSetToday(ex);
     if (best) return { value: best.e1, best };
     const st = ex.ref.state;
@@ -431,6 +445,9 @@
     }
     const tv = card.querySelector(".e1v");
     if (!tv) return;
+    const tile = tv.closest(".tile"), cap = tile.querySelector(".cap");   // "TS" under the number while the TS holds it
+    if (anchorE1rm(ex) != null && !cap) tile.append(el("span", "cap", "TS"));
+    else if (anchorE1rm(ex) == null && cap) cap.remove();
     const cur = currentE1rm(ex);
     tv.textContent = cur ? String(Math.round(cur.value)) : (ex.ref.state ? "–" : "…");
   }
@@ -625,7 +642,7 @@
     };
 
     const cur = currentE1rm(ex);
-    const e1Tile = tile("e1rm", el("span", "tl", "e1RM"), show(cur ? Math.round(cur.value) : null));
+    const e1Tile = tile("e1rm", el("span", "tl", "e1RM"), show(cur ? Math.round(cur.value) : null), anchorE1rm(ex) != null ? "TS" : "");
     e1Tile.querySelector(".tv").classList.add("e1v");
     tiles.append(e1Tile);
 
