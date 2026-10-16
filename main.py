@@ -258,10 +258,27 @@ class ObservedLift(BaseModel):
 class ObservedCell(BaseModel):
     rpe: float
     reps: int
-    n: int  # sets averaged into this cell, not counting the TS
-    ts: int = 0  # TS sets that sit in this cell: the reference the rest are measured with, shown but not averaged
-    observed: float  # fraction of the anchor e1RM
+    n: int  # sets averaged into this cell (the TS counts like any other set)
+    ts: int = 0  # how many of those are the TS
+    observed: float  # fraction of each workout's fitted e1RM, averaged over the sets
     chart: float | None = None  # what the RPE table in use says for the same RPE and reps
+
+
+class EstimatedCell(BaseModel):
+    rpe: float
+    reps: int
+    estimated: float  # interpolated from the sets logged at nearby efforts, never from the table in use
+    chart: float | None = None
+
+
+class DataGate(BaseModel):
+    passed: bool  # all three below met: estimated cells are shown
+    sets: int
+    min_sets: int
+    workouts: int
+    min_workouts: int
+    k_span: float  # reps of effort between the hardest and easiest sets logged
+    min_k_span: float
 
 
 class FitSession(BaseModel):
@@ -283,12 +300,11 @@ class CurveFit(BaseModel):
 class ObservedTable(BaseModel):
     exercise_template_id: str
     title: str | None = None
-    anchor_e1rm_lb: float | None = None  # the newest TS's e1RM
-    anchor_set_at: str | None = None
-    sets_used: int  # sets other than the TS that were measured
+    sets_used: int  # working sets measured, the TS included
     ts_sets: int = 0
-    sets_without_anchor: int  # logged before the movement's first TS, so no anchor to measure against
     cells: list[ObservedCell]
+    estimated: list[EstimatedCell] = []  # only once the gate is passed
+    gate: DataGate
     fit: CurveFit | None = None  # a table-free fit to all the sets; None until a workout has sets at two different k
 
 

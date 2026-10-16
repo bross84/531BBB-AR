@@ -50,8 +50,12 @@
     td.near { background: var(--near-bg); }
     td.off { background: var(--off-bg); }
     td.far { background: var(--far-bg); }
-    td.anchor { background: transparent; border: 1.5px solid var(--accent); }
-    td.anchor .s { color: var(--accent); font-weight: 500; }
+    td.est { background: transparent; border: 1.5px dotted var(--accent); }
+    td.est .v { font-weight: 400; font-style: italic; }
+    td.est .s { color: var(--accent); }
+    .gate { font-size: 13px; color: var(--muted); margin: 0 0 8px; }
+    .gate b { color: var(--text); font-weight: 500; }
+    .gate .ok { color: var(--accent); }
     td.blank { background: transparent; border: 0; }
     .show { display: block; font-size: 13px; color: var(--muted); margin: 0 0 8px; }
     .show input { margin-right: 6px; }
@@ -134,19 +138,33 @@
       sum.append("The table every other movement uses (rows, presses, accessories and so on). Squat, bench and deadlift each have their own tab; nothing is logged against this one.");
     } else if (data.nothingLogged) {
       sum.append("Nothing logged yet for " + data.title + ". Save a workout with an RPE on its working sets and a TS set, and this fills in.");
-    } else if (data.anchor_e1rm_lb != null) {
-      const b = el("b", null, Math.round(data.anchor_e1rm_lb) + " lb (" + Math.round(data.anchor_e1rm_lb / LB_PER_KG) + " kg)");
-      sum.append("Measured against your newest TS e1RM, ", b, " from " + fmtDate(data.anchor_set_at) + ". ");
+    } else if (data.cells.length === 0) {
+      sum.append("Not enough yet to read these sets. A table needs at least one workout with sets at clearly different effort, such as a single and sets of five at lower RPEs. Every set counts, the TS included, and nothing here comes from the table in use.");
     } else {
-      sum.append("No TS saved for this lift yet. Mark a set as the TS (tap its set number) and save the workout, and the table has something to measure against. ");
+      sum.append("Each workout gets its own e1RM fitted from its own sets, so nothing is measured against a number borrowed from the table. ");
     }
     if (!data.general && !data.nothingLogged) {
       sum.append(data.sets_used + (data.sets_used === 1 ? " set" : " sets") + " used");
-      if (data.ts_sets) sum.append(", plus " + data.ts_sets + " TS");
-      if (data.sets_without_anchor) sum.append(", " + data.sets_without_anchor + " logged before the first TS");
+      if (data.ts_sets) sum.append(" (" + data.ts_sets + " of them TS)");
       sum.append(".");
     }
     card.append(sum);
+
+    if (!data.general && !data.nothingLogged && data.gate) {
+      const g = data.gate, gp = el("p", "gate");
+      const part = (have, need, label, fmt) => {
+        const met = have >= need;
+        const span = el("span", met ? "ok" : null);
+        span.append(el("b", null, fmt(have)), " of " + fmt(need) + " " + label + (met ? " ✓" : ""));
+        return span;
+      };
+      if (g.passed) {
+        gp.append(el("b", "ok", "Estimated cells are on. "), "This lift has enough data (" + g.sets + " sets, " + g.workouts + " workouts, " + g.k_span.toFixed(1) + " reps of effort), so cells you haven't hit are interpolated between the efforts your sets measured, never from the table in use. They stay empty past the hardest and easiest effort you've logged.");
+      } else {
+        gp.append("Estimated cells appear once there's enough data: ", part(g.sets, g.min_sets, "sets", String), ", ", part(g.workouts, g.min_workouts, "workouts", String), ", ", part(Math.min(g.k_span, g.min_k_span), g.min_k_span, "reps of effort covered", (v) => String(+v.toFixed(1))), ".");
+      }
+      card.append(gp);
+    }
 
     if (!data.general) {
       const lab = el("label", "show");
@@ -161,6 +179,7 @@
     }
 
     const cells = new Map(data.cells.map((c) => [c.rpe + "|" + c.reps, c]));
+    const ests = new Map((data.estimated || []).map((c) => [c.rpe + "|" + c.reps, c]));
     const rpes = [];
     for (let r = 10; r >= 5; r -= 0.5) rpes.push(r);
     for (const c of data.cells) if (!rpes.includes(c.rpe)) rpes.push(c.rpe);
@@ -178,16 +197,17 @@
       for (let n = 1; n <= maxReps; n++) {
         const c = cells.get(rpe + "|" + n), chart = table.get(rpe + "|" + n);
         const td = el("td");
-        if (c && c.n === 0) {   // only the TS here: the reference, so it can only agree with the table
-          td.className = "anchor";
-          td.append(el("div", "v", pct(c.observed)), el("div", "s", "TS"));
-          td.title = "Your TS: the set the other sets are measured against, so it sits at the table's value by definition.";
-        } else if (c) {
+        const est = ests.get(rpe + "|" + n);
+        if (c) {
           const diff = c.chart != null ? c.observed - c.chart : 0;
           td.className = c.chart != null ? band(diff) : "";
           td.append(el("div", "v", pct(c.observed)));
-          td.append(el("div", "s", (c.chart != null ? (diff >= 0 ? "+" : "−") + (Math.abs(diff) * 100).toFixed(1) + " · " : "") + "n" + c.n + (c.ts ? " +TS" : "")));
-          td.title = "Your sets: " + pct(c.observed) + "% of e1RM (" + c.n + (c.n === 1 ? " set" : " sets") + (c.chart != null ? "). Table in use: " + pct(c.chart) + "%." : ").");
+          td.append(el("div", "s", (c.chart != null ? (diff >= 0 ? "+" : "−") + (Math.abs(diff) * 100).toFixed(1) + " · " : "") + "n" + c.n + (c.ts ? " · TS" : "")));
+          td.title = "Your sets: " + pct(c.observed) + "% of each workout's fitted e1RM (" + c.n + (c.n === 1 ? " set" : " sets") + (c.ts ? ", including your TS" : "") + (c.chart != null ? "). Table in use: " + pct(c.chart) + "%." : ").");
+        } else if (est) {
+          td.className = "est";
+          td.append(el("div", "v", pct(est.estimated)), el("div", "s", "est"));
+          td.title = "Estimated from your sets at nearby efforts: " + pct(est.estimated) + "%." + (est.chart != null ? " Table in use: " + pct(est.chart) + "%." : "");
         } else if (chart != null && (showTable || data.general)) {
           td.className = "none";
           td.append(el("div", "v", pct(chart)));
@@ -204,17 +224,17 @@
     card.append(scroll);
 
     const legend = el("div", "legend");
-    for (const [cls, text] of [["near", "within 1 point of the table"], ["off", "1 to 2.5 points off"], ["far", "more than 2.5 off"], ["anchor", "your TS, the reference"], ...(showTable || data.general ? [["none", "the table in use (nothing logged here yet)"]] : [])]) {
+    for (const [cls, text] of [["near", "within 1 point of the table"], ["off", "1 to 2.5 points off"], ["far", "more than 2.5 off"], ...(data.estimated && data.estimated.length ? [["est", "estimated from your other sets"]] : []), ...(showTable || data.general ? [["none", "the table in use (nothing logged here yet)"]] : [])]) {
       const item = el("span");
       const swatch = el("i"); swatch.className = "";
-      swatch.style.background = cls === "none" || cls === "anchor" ? "transparent" : "var(--" + cls + "-bg)";
+      swatch.style.background = cls === "none" || cls === "est" ? "transparent" : "var(--" + cls + "-bg)";
       if (cls === "none") swatch.style.borderStyle = "dashed";
-      if (cls === "anchor") swatch.style.borderColor = "var(--accent)";
+      if (cls === "est") { swatch.style.borderStyle = "dotted"; swatch.style.borderColor = "var(--accent)"; }
       item.append(swatch, text);
       legend.append(item);
     }
     card.append(legend);
-    card.append(el("p", "note", "Each filled cell is the average of your sets at that RPE and reps, as a share of the anchor e1RM, with the gap to the table in use and how many sets it rests on (n). Higher than the table means you can do more than it says at that RPE. Warm-ups and drop sets are left out. Your TS sits in its own cell as the reference and isn't averaged in. This grid measures against the TS's e1RM, which comes from the table itself, so see the fitted curve below for a view that doesn't. A cell on one or two sets is a hint, not a result."));
+    card.append(el("p", "note", "Each filled cell is the average of your sets at that RPE and reps, as a share of each workout's fitted e1RM, with the gap to the table in use and how many sets it rests on (n). Higher than the table means you can do more than it says at that RPE. Warm-ups and drop sets are left out; the TS counts like any other set. A set of 5 at RPE 7 is as hard as 8 reps at RPE 10, so sets at different RPEs and reps all inform the same curve. A cell on one or two sets is a hint, not a result."));
     view.append(card);
     if (!data.general && !data.nothingLogged) view.append(renderFit(data.fit));
   }
