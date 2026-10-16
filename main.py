@@ -208,6 +208,7 @@ class ExerciseRefInput(BaseModel):
     step_lb: float = Field(default=refs_store.DEFAULT_STEP_LB, ge=0.5, le=25.0)  # the same, when you lift in lb
     bar_kg: float = Field(default=refs_store.DEFAULT_BAR_KG, ge=0, le=100)  # the bar this movement is lifted with (for the plate loader)
     chain_kg: float = Field(default=refs_store.DEFAULT_CHAIN_KG, ge=0, le=200)  # chains hung on the bar: part of the load, not plates
+    rest_sec: int | None = Field(default=None, ge=0, le=3600)  # this movement's rest timer in seconds (0 = off); None = the page's default
 
 
 class ExerciseRef(ExerciseRefInput):
@@ -252,7 +253,7 @@ def list_exercise_refs():
 
 @app.put("/exercise-refs/{exercise_template_id}", response_model=ExerciseRef)
 def put_exercise_ref(exercise_template_id: str, data: ExerciseRefInput):
-    return refs_store.save_ref(exercise_template_id, data.basis, data.ls, data.tm_pct, data.step_kg, data.step_lb, data.bar_kg, data.chain_kg)
+    return refs_store.save_ref(exercise_template_id, data.basis, data.ls, data.tm_pct, data.step_kg, data.step_lb, data.bar_kg, data.chain_kg, data.rest_sec)
 
 
 @app.get("/hevy/exercise-state/{exercise_template_id}", response_model=ExerciseState)

@@ -46,13 +46,13 @@ class TestMovementSettings(RefsCase):
     def test_defaults_are_e1rm_last_set_on_and_95_percent(self):
         r = self.client.put("/exercise-refs/tpl-bench", json={})
         self.assertEqual(
-            {"exercise_template_id": "tpl-bench", "basis": "e1rm", "ls": True, "tm_pct": 0.95, "step_kg": 2.5, "step_lb": 5.0, "bar_kg": 20.0, "chain_kg": 0.0}, r.json()
+            {"exercise_template_id": "tpl-bench", "basis": "e1rm", "ls": True, "tm_pct": 0.95, "step_kg": 2.5, "step_lb": 5.0, "bar_kg": 20.0, "chain_kg": 0.0, "rest_sec": None}, r.json()
         )
 
     def test_save_and_list(self):
         r = self.client.put("/exercise-refs/tpl-squat", json={"basis": "tm", "ls": False, "tm_pct": 0.9})
         self.assertEqual(200, r.status_code, r.text)
-        expected = {"exercise_template_id": "tpl-squat", "basis": "tm", "ls": False, "tm_pct": 0.9, "step_kg": 2.5, "step_lb": 5.0, "bar_kg": 20.0, "chain_kg": 0.0}
+        expected = {"exercise_template_id": "tpl-squat", "basis": "tm", "ls": False, "tm_pct": 0.9, "step_kg": 2.5, "step_lb": 5.0, "bar_kg": 20.0, "chain_kg": 0.0, "rest_sec": None}
         self.assertEqual(expected, r.json())
         self.assertEqual([expected], self.client.get("/exercise-refs").json())
 
@@ -94,6 +94,17 @@ class TestMovementSettings(RefsCase):
         got = {r["exercise_template_id"]: (r["bar_kg"], r["chain_kg"]) for r in self.client.get("/exercise-refs").json()}
         self.assertEqual({"ssb-squat": (30.0, 0.0), "bench": (20.0, 20.0), "deadlift": (20.0, 0.0)}, got)
 
+    def test_rest_time_is_saved_per_movement_and_none_means_the_default(self):
+        self.client.put("/exercise-refs/squat", json={"rest_sec": 240})
+        self.client.put("/exercise-refs/curl", json={"rest_sec": 0})   # 0 is "off", not "default"
+        self.client.put("/exercise-refs/bench", json={})
+        got = {r["exercise_template_id"]: r["rest_sec"] for r in self.client.get("/exercise-refs").json()}
+        self.assertEqual({"squat": 240, "curl": 0, "bench": None}, got)
+
+    def test_rejects_a_silly_rest_time(self):
+        for bad in (-1, 3601):
+            self.assertEqual(422, self.client.put("/exercise-refs/x", json={"rest_sec": bad}).status_code, bad)
+
     def test_rejects_a_silly_bar_or_chain_weight(self):
         for body in ({"bar_kg": -1}, {"bar_kg": 101}, {"chain_kg": -5}, {"chain_kg": 201}):
             self.assertEqual(422, self.client.put("/exercise-refs/x", json=body).status_code, body)
@@ -119,7 +130,7 @@ class TestMovementSettings(RefsCase):
         conn.close()
         database.init_db()
         self.assertEqual(
-            [{"exercise_template_id": "old", "basis": "tm", "ls": True, "tm_pct": 0.95, "step_kg": 2.5, "step_lb": 5.0, "bar_kg": 20.0, "chain_kg": 0.0}],
+            [{"exercise_template_id": "old", "basis": "tm", "ls": True, "tm_pct": 0.95, "step_kg": 2.5, "step_lb": 5.0, "bar_kg": 20.0, "chain_kg": 0.0, "rest_sec": None}],
             self.client.get("/exercise-refs").json(),
         )
 

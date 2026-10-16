@@ -27,6 +27,7 @@ The gym is the garage on the home network, so none of this blocks use there.
 
 ## Done recently
 
+- Rest time per exercise and a much louder alarm (2026-10-16): each exercise has its own rest time (a chip on its card, stored per movement in `exercise_refs.rest_sec`), the bar picker is now the default for exercises without one, and the end-of-rest alarm is square waves at full volume for about 3 seconds.
 - Our own record of sets (2026-10-15): every set of a workout saved to Hevy is also kept in the `logged_sets` table with the RPE as typed (Hevy drops anything below 6 or 6.5), the set type, whether it was the TS, and the Hevy workout id. Only starts from the day it was deployed; Hevy history is not backfilled yet.
 
 - Renamed the project to Rackbook (2026-10-15): page titles, docs, container, volume (`rackbook-data`) and database file (`rackbook.db`). `plan.md` is a history log and keeps the old name.

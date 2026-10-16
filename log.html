@@ -368,11 +368,11 @@
     if (input && document.activeElement !== input) input.value = primaryText(s);
     if (cell) cell.textContent = refText(s);
   }
-  function defaultRef() { return { basis: "e1rm", ls: true, tmPct: 0.95, stepKg: 2.5, stepLb: 5, barKg: 20, chainKg: 0, state: null, ts: null }; }
+  function defaultRef() { return { basis: "e1rm", ls: true, tmPct: 0.95, stepKg: 2.5, stepLb: 5, barKg: 20, chainKg: 0, restSec: null, state: null, ts: null }; }
   function refFromServer(id) {
     const r = refs[id];
     if (!r) return defaultRef();
-    return { basis: r.basis, ls: r.ls, tmPct: r.tm_pct, stepKg: r.step_kg || 2.5, stepLb: r.step_lb || 5, barKg: r.bar_kg ?? 20, chainKg: r.chain_kg ?? 0, state: null, ts: null };
+    return { basis: r.basis, ls: r.ls, tmPct: r.tm_pct, stepKg: r.step_kg || 2.5, stepLb: r.step_lb || 5, barKg: r.bar_kg ?? 20, chainKg: r.chain_kg ?? 0, restSec: r.rest_sec ?? null, state: null, ts: null };
   }
 
   // The e1RM of the nearest earlier set that is ticked done and has weight, reps and an RPE.
@@ -502,7 +502,7 @@
     const id = ex.template_id;
     clearTimeout(refTimers[id]);
     refTimers[id] = setTimeout(async () => {
-      const body = { basis: ex.ref.basis, ls: ex.ref.ls, tm_pct: ex.ref.tmPct, step_kg: ex.ref.stepKg, step_lb: ex.ref.stepLb, bar_kg: ex.ref.barKg, chain_kg: ex.ref.chainKg };
+      const body = { basis: ex.ref.basis, ls: ex.ref.ls, tm_pct: ex.ref.tmPct, step_kg: ex.ref.stepKg, step_lb: ex.ref.stepLb, bar_kg: ex.ref.barKg, chain_kg: ex.ref.chainKg, rest_sec: ex.ref.restSec };
       try {
         refs[id] = await api("/exercise-refs/" + encodeURIComponent(id), {
           method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
@@ -895,6 +895,16 @@
         ex.ref[unit === "lb" ? "stepLb" : "stepKg"] = Number(v); applyAuto(ex); saveDraft(); saveRef(ex); refreshCard(ex);
       });
     });
+    const rest = el("button", "chip", "Rest " + restLabel(restFor(ex)) + " ▾");
+    rest.type = "button"; rest.setAttribute("aria-label", "Rest time after each working set of " + ex.title);
+    rest.addEventListener("click", () => {
+      const items = REST_OPTIONS.map((v) => ({ v, label: restLabel(v), on: v === ex.ref.restSec }));
+      items.unshift({ v: "default", label: "Default (" + restLabel(restSecs) + ")", on: ex.ref.restSec == null });
+      openSheet("Rest after " + ex.title, "Starts when you tick a working set of this exercise. Default is the time set in the bottom bar.", items, 4, (v) => {
+        ex.ref.restSec = v === "default" ? null : Number(v);
+        saveDraft(); saveRef(ex); refreshCard(ex);
+      });
+    });
     const more = el("button", "more", "⋯");
     more.type = "button"; more.setAttribute("aria-label", "More for " + ex.title);
     more.addEventListener("click", () => openSheet(ex.title, "", [
@@ -905,7 +915,7 @@
       if (!confirm("Remove " + ex.title + " from this workout?")) return;
       draft.exercises = draft.exercises.filter((e) => e.id !== ex.id); saveDraft(); renderWorkout();
     }));
-    head.append(chip, more);
+    head.append(chip, rest, more);
     left.append(renderRefBar(ex));
     const cols = el("div", "cols");
     const heads = unit === "lb" ? ["Set", "Previous", "Lb", "Kg", "Reps", "RPE", ""] : ["Set", "Previous", "Kg", "Lb", "Reps", "RPE", ""];
@@ -963,7 +973,8 @@
         row.classList.toggle("done", s.done);
         showRpe(rpe, s.done ? (s.arpe || s.rpe) : s.rpe);
         applyAuto(ex); saveDraft();
-        if (s.done && s.type !== "warmup" && restSecs > 0) restStart(restSecs);   // the rest timer; warm-ups don't start it
+        const rest = restFor(ex);
+        if (s.done && s.type !== "warmup" && rest > 0) restStart(rest);   // the rest timer, this movement's own time; warm-ups don't start it
       });
 
       row.append(kind, prevCell, wt, refCell, reps, rpe, tick);
@@ -1171,6 +1182,7 @@
   } catch (e) {}
   const mmss = (secs) => Math.floor(secs / 60) + ":" + String(secs % 60).padStart(2, "0");
   const restLabel = (secs) => (secs ? mmss(secs) : "Off");
+  const restFor = (ex) => (ex.ref.restSec == null ? restSecs : ex.ref.restSec);   // this movement's own rest time, else the default
   function restSave() {
     try {
       localStorage.setItem("restSecs", String(restSecs));
@@ -1186,7 +1198,7 @@
     $("restPick").hidden = active;
     $("restTime").hidden = !active;
     $("restMinus").hidden = !running; $("restPlus").hidden = !running;
-    $("restPick").textContent = "Rest " + restLabel(restSecs) + " ▾";
+    $("restPick").textContent = "Default rest " + restLabel(restSecs) + " ▾";
     $("restMain").textContent = running ? "Skip" : restDone ? "Dismiss" : "Start";
     if (running) {
       const left = Math.max(0, restEnd - Date.now());
@@ -1195,15 +1207,22 @@
     } else if (restDone) { $("restTime").textContent = "Rest over"; $("restProg").firstElementChild.style.width = "0%"; }
   }
   function restBeep() {
-    try { if (navigator.vibrate) navigator.vibrate([250, 120, 250, 120, 250]); } catch (e) {}
+    try { if (navigator.vibrate) navigator.vibrate([400, 150, 400, 150, 400, 150, 400]); } catch (e) {}
     try {
       if (!audio) return;
-      const t0 = audio.currentTime;
-      for (let i = 0; i < 3; i++) {
-        const osc = audio.createOscillator(), gain = audio.createGain(), at = t0 + i * 0.3;
-        osc.frequency.value = 880; osc.connect(gain); gain.connect(audio.destination);
-        gain.gain.setValueAtTime(0.25, at); gain.gain.setValueAtTime(0, at + 0.18);
-        osc.start(at); osc.stop(at + 0.2);
+      // Loud on purpose: square waves (much harsher than a sine) at full gain, two alternating tones, about 3 seconds.
+      // A compressor in front keeps the stacked tones from clipping. The phone's media volume still sets the ceiling.
+      const t0 = audio.currentTime, comp = audio.createDynamicsCompressor();
+      comp.threshold.value = -30; comp.ratio.value = 12; comp.attack.value = 0.003; comp.release.value = 0.1;
+      comp.connect(audio.destination);
+      for (let i = 0; i < 8; i++) {
+        const at = t0 + i * 0.4;
+        for (const f of [i % 2 ? 1320 : 990, i % 2 ? 1760 : 1320]) {
+          const osc = audio.createOscillator(), gain = audio.createGain();
+          osc.type = "square"; osc.frequency.value = f; osc.connect(gain); gain.connect(comp);
+          gain.gain.setValueAtTime(1, at); gain.gain.setValueAtTime(0, at + 0.3);
+          osc.start(at); osc.stop(at + 0.32);
+        }
       }
     } catch (e) {}
   }
@@ -1231,9 +1250,9 @@
   $("restMinus").addEventListener("click", () => { if (restEnd !== null) { const was = restEnd; restEnd = Math.max(Date.now() + 1000, restEnd - 15000); restTotal = Math.max(1, restTotal - (was - restEnd) / 1000); restSave(); restRender(); } });
   $("restPlus").addEventListener("click", () => { if (restEnd !== null) { restEnd += 15000; restTotal += 15; restSave(); restRender(); } });
   $("restPick").addEventListener("click", () => openSheet(
-    "Rest timer", "Starts when you tick a working set. Warm-ups don't start it.",
+    "Default rest", "For exercises without their own rest time (set on each exercise). Starts when you tick a working set. Warm-ups don't start it.",
     REST_OPTIONS.map((v) => ({ v, label: restLabel(v), on: v === restSecs })), 4,
-    (v) => { restSecs = Number(v); restSave(); restRender(); }
+    (v) => { restSecs = Number(v); restSave(); restRender(); if (draft && !$("workout").hidden) renderWorkout(); }   // redraw so each exercise's chip shows the new default
   ));
   document.addEventListener("visibilitychange", () => { if (!document.hidden) { keepAwake(); restLoop(); } });
   restRender();
@@ -1282,7 +1301,7 @@
     if (draft && Array.isArray(draft.exercises)) {
       for (const ex of draft.exercises) {
         const old = ex.ref || {};
-        ex.ref = { basis: old.basis || "e1rm", ls: old.ls === undefined ? true : old.ls, tmPct: old.tmPct || 0.95, stepKg: old.stepKg || 2.5, stepLb: old.stepLb || 5, barKg: old.barKg ?? 20, chainKg: old.chainKg ?? 0, state: old.state || null, ts: old.ts || null };
+        ex.ref = { basis: old.basis || "e1rm", ls: old.ls === undefined ? true : old.ls, tmPct: old.tmPct || 0.95, stepKg: old.stepKg || 2.5, stepLb: old.stepLb || 5, barKg: old.barKg ?? 20, chainKg: old.chainKg ?? 0, restSec: old.restSec ?? null, state: old.state || null, ts: old.ts || null };
         for (const s of ex.sets) {
           if (s.manual === undefined) s.manual = false;
           if (s.kg === undefined) { const l = parseFloat(s.lb); s.kg = l > 0 ? String(Math.round(l / LB_PER_KG * 2) / 2) : ""; delete s.lb; }

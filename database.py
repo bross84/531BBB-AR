@@ -151,6 +151,7 @@ def init_db() -> None:
                 step_lb REAL NOT NULL DEFAULT 5,
                 bar_kg REAL NOT NULL DEFAULT 20,
                 chain_kg REAL NOT NULL DEFAULT 0,
+                rest_sec INTEGER,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
             );
 
@@ -193,6 +194,7 @@ def init_db() -> None:
             "ALTER TABLE exercise_refs ADD COLUMN step_lb REAL NOT NULL DEFAULT 5",
             "ALTER TABLE exercise_refs ADD COLUMN bar_kg REAL NOT NULL DEFAULT 20",
             "ALTER TABLE exercise_refs ADD COLUMN chain_kg REAL NOT NULL DEFAULT 0",
+            "ALTER TABLE exercise_refs ADD COLUMN rest_sec INTEGER",
         ):
             try:
                 conn.execute(ddl)
