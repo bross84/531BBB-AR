@@ -585,7 +585,8 @@
         title: ex.title,
         notes: "",
         ref: refFromServer(ex.exercise_template_id),
-        sets: ex.sets.map((s) => ({
+        // warm-ups are not copied: they belong to the weights of that day. "+ Warm-up sets" builds them when you ask.
+        sets: ex.sets.filter((s) => s.type !== "warmup").map((s) => ({
           type: s.type || "normal",
           kg: s.weight_kg != null ? trim(s.weight_kg) : "",
           reps: s.reps != null ? String(s.reps) : "",
@@ -595,6 +596,8 @@
         })),
       })).filter((ex) => ex.template_id),
     };
+    // an exercise that was only warm-ups still needs a set to fill in
+    for (const ex of draft.exercises) if (!ex.sets.length) ex.sets.push({ type: "normal", kg: "", reps: "", rpe: "", done: false, manual: false });
     saveDraft(); say(""); renderWorkout();
     draft.exercises.forEach(loadState);
   }
