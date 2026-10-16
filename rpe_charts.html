@@ -75,6 +75,7 @@
   const LIFT_KEY = "rpeCharts.lift";
   const LB_PER_KG = 2.20462;
   let lifts = [], table = new Map(), current = null, loadId = 0;
+  const LABELS = { squat: "Squat", bench: "Bench", deadlift: "Deadlift", general: "General" };
 
   function el(tag, cls, text) {
     const node = document.createElement(tag);
@@ -96,14 +97,16 @@
   const pct = (f) => (f * 100).toFixed(1);
   const fmtDate = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleDateString(undefined, { month: "short", day: "numeric" }); };
 
+  // Squat, bench and deadlift each get a table of their own; General is the table every other movement shares.
   function renderLifts() {
     const box = $("lifts");
     box.replaceChildren();
-    for (const l of lifts) {
-      const b = el("button", null, l.title || l.exercise_template_id);
-      b.type = "button"; b.setAttribute("aria-pressed", String(l.exercise_template_id === current));
-      b.append(el("small", null, l.sets + (l.sets === 1 ? " set" : " sets")));
-      b.addEventListener("click", () => select(l.exercise_template_id));
+    for (const key of [...lifts.map((l) => l.key), "general"]) {
+      const l = lifts.find((x) => x.key === key);
+      const b = el("button", null, LABELS[key]);
+      b.type = "button"; b.setAttribute("aria-pressed", String(key === current));
+      if (l) b.append(el("small", null, l.sets + (l.sets === 1 ? " set" : " sets")));
+      b.addEventListener("click", () => select(key));
       box.append(b);
     }
   }
@@ -116,15 +119,21 @@
     view.replaceChildren();
     const card = el("div", "card");
     const sum = el("p", "sum");
-    if (data.anchor_e1rm_lb != null) {
+    if (data.general) {
+      sum.append("The table every other movement uses (rows, presses, accessories and so on). Squat, bench and deadlift each have their own tab; nothing is logged against this one.");
+    } else if (data.nothingLogged) {
+      sum.append("Nothing logged yet for " + data.title + ". Save a workout with an RPE on its working sets and a TS set, and this fills in.");
+    } else if (data.anchor_e1rm_lb != null) {
       const b = el("b", null, Math.round(data.anchor_e1rm_lb) + " lb (" + Math.round(data.anchor_e1rm_lb / LB_PER_KG) + " kg)");
       sum.append("Measured against your newest TS e1RM, ", b, " from " + fmtDate(data.anchor_set_at) + ". ");
     } else {
       sum.append("No TS saved for this lift yet. Mark a set as the TS (tap its set number) and save the workout, and the table has something to measure against. ");
     }
-    sum.append(data.sets_used + (data.sets_used === 1 ? " set" : " sets") + " used");
-    if (data.sets_without_anchor) sum.append(", " + data.sets_without_anchor + " logged before the first TS");
-    sum.append(".");
+    if (!data.general && !data.nothingLogged) {
+      sum.append(data.sets_used + (data.sets_used === 1 ? " set" : " sets") + " used");
+      if (data.sets_without_anchor) sum.append(", " + data.sets_without_anchor + " logged before the first TS");
+      sum.append(".");
+    }
     card.append(sum);
 
     const cells = new Map(data.cells.map((c) => [c.rpe + "|" + c.reps, c]));
@@ -180,13 +189,15 @@
     view.append(card);
   }
 
-  async function select(id) {
-    current = id;
-    try { localStorage.setItem(LIFT_KEY, id); } catch (e) { /* storage can be unavailable */ }
+  async function select(key) {
+    current = key;
+    try { localStorage.setItem(LIFT_KEY, key); } catch (e) { /* storage can be unavailable */ }
     renderLifts();
-    const mine = ++loadId;
+    const mine = ++loadId, lift = lifts.find((l) => l.key === key);
+    if (!lift) { showError(""); renderTable({ general: true, cells: [] }); return; }
+    if (!lift.exercise_template_id) { showError(""); renderTable({ nothingLogged: true, title: lift.title, cells: [] }); return; }
     try {
-      const data = await api("/rpe-observed/" + encodeURIComponent(id));
+      const data = await api("/rpe-observed/" + encodeURIComponent(lift.exercise_template_id));
       if (mine !== loadId) return;
       showError("");
       renderTable(data);
@@ -201,13 +212,9 @@
       lifts = list;
       table = new Map(rows.rows.map(([rpe, reps, f]) => [rpe + "|" + reps, f]));
     } catch (err) { showError(err.message); return; }
-    if (!lifts.length) {
-      $("view").append(el("div", "empty", "Nothing here yet. Save a workout from the log page with an RPE on your working sets and a TS set, and this fills in."));
-      return;
-    }
     let saved = null;
     try { saved = localStorage.getItem(LIFT_KEY); } catch (e) { /* storage can be unavailable */ }
-    select(lifts.some((l) => l.exercise_template_id === saved) ? saved : lifts[0].exercise_template_id);
+    select(saved in LABELS ? saved : "squat");
   }
   init();
 </script>

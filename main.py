@@ -248,8 +248,9 @@ def get_rpe_table():
 
 
 class ObservedLift(BaseModel):
-    exercise_template_id: str
-    title: str | None = None
+    key: Literal["squat", "bench", "deadlift"]
+    title: str  # the lift's Hevy exercise, as on the Progress page
+    exercise_template_id: str | None = None  # None until a set of it has been logged with an RPE
     sets: int  # working sets logged with an RPE
     sessions: int
 
@@ -279,8 +280,9 @@ def rpe_charts_page():
 
 @app.get("/rpe-observed", response_model=list[ObservedLift])
 def list_observed_lifts():
-    """The movements with logged sets to build an RPE table from."""
-    return set_log.lifts_with_rpe()
+    """The lifts that get an RPE table of their own: squat, bench and deadlift. Everything else shares the general table."""
+    titles = {key: progress.LIFT_TITLES[key] for key in ("squat", "bench", "deadlift")}
+    return set_log.main_lifts(titles)
 
 
 @app.get("/rpe-observed/{exercise_template_id}", response_model=ObservedTable)

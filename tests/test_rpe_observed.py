@@ -100,15 +100,21 @@ class TestObservedRoutes(unittest.TestCase):
                  "exercises": [{"exercise_template_id": template, "title": title, "sets": sets}]}
         set_log.record(set_log.rows_from_entry(entry, "h1"))
 
-    def test_lists_movements_that_have_working_sets_with_an_rpe(self):
-        self._log("tpl-squat", "Squat", [
+    def test_lists_squat_bench_and_deadlift_with_what_is_logged_for_each(self):
+        self._log("tpl-squat", "Squat, Low Bar w/ Belt", [
             {"type": "warmup", "weight_kg": 60, "reps": 5, "rpe": None},
             {"type": "normal", "weight_kg": 120, "reps": 5, "rpe": 5},
             {"type": "normal", "weight_kg": 128, "reps": 5, "rpe": 7},
         ])
-        self._log("tpl-row", "Row", [{"type": "normal", "weight_kg": 80, "reps": 5, "rpe": None}])   # no RPE: not listed
+        self._log("tpl-row", "Pendlay Row (Barbell)", [{"type": "normal", "weight_kg": 80, "reps": 5, "rpe": 7}])   # not a main lift: not listed
         got = self.client.get("/rpe-observed").json()
-        self.assertEqual([{"exercise_template_id": "tpl-squat", "title": "Squat", "sets": 2, "sessions": 1}], got)
+        self.assertEqual(["squat", "bench", "deadlift"], [l["key"] for l in got])
+        self.assertEqual(("tpl-squat", 2, 1), (got[0]["exercise_template_id"], got[0]["sets"], got[0]["sessions"]))
+        self.assertEqual((None, 0, 0), (got[1]["exercise_template_id"], got[1]["sets"], got[1]["sessions"]))   # nothing logged yet
+
+    def test_a_squat_logged_without_an_rpe_does_not_count(self):
+        self._log("tpl-squat", "Squat, Low Bar w/ Belt", [{"type": "normal", "weight_kg": 120, "reps": 5, "rpe": None}])
+        self.assertIsNone(self.client.get("/rpe-observed").json()[0]["exercise_template_id"])
 
     def test_the_table_for_a_movement_uses_its_saved_ts_as_the_anchor(self):
         self._log("tpl-squat", "Squat", [
