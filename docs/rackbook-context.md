@@ -40,6 +40,7 @@ Brian lifts 3 days a week and logs on his phone in the gym. He works up to a sin
 | `/log` | `log.html` | The workout log. The main page. |
 | `/recent` | `recent.html` | Latest Hevy workouts |
 | `/progress` | `progress.html` | Each main lift's e1RM, 7-day bodyweight and DOTS-style score over time |
+| `/stress` | `stress.html` | Main three movement overview, selector, stress components, rolling totals, and retrospective session history |
 | `/rpe-charts` | `rpe_charts.html` | RPE tables built from the user's own sets (Squat, Bench, Deadlift, General tabs) |
 | `/legacy` | `index.html` | The original 5/3/1 planner; its `#settings` is where the Hevy API key is saved |
 | `/health` | | `{"status":"ok"}` |
@@ -53,6 +54,8 @@ Routes used by the log, RPE and progress pages (the legacy planner has many more
 | `GET /hevy/exercise-state/{template_id}` | A movement's e1RM and previous sets, from its last Hevy session |
 | `GET /training-max/{template_id}` | A movement's latest saved TS |
 | `POST /movement-stress/{template_id}` | Read-only stress preview for completed draft sets plus Hevy/local history; never saves a workout |
+| `GET /stress/movements` | Cached movements, identifying the main squat, bench and deadlift by the Progress titles |
+| `GET /movement-stress/{template_id}/history?days=56` | Saved-session stress history and current rolling totals; days=0 means all available history |
 | `GET/PUT /exercise-refs[/{template_id}]` | Per-movement settings |
 | `GET /rpe-table` | The RPE table in use, as `[rpe, reps, fraction]` rows |
 | `GET /rpe-observed`, `GET /rpe-observed/{template_id}` | The lifts with RPE tables, and one lift's observed cells, estimated cells, data gate and curve fit |
@@ -147,6 +150,8 @@ The local sets of a saved workout replace its Hevy snapshot for stress, preservi
 The session window is 80–120% of the median prior session total in the trailing 56 days, excluding the draft. Elevated is above 120%; much higher above 150%. With no history there is no window; fewer than six prior sessions is provisional. Estimated baseline sessions are counted visibly. These are descriptive comparisons, not recovery/safety thresholds. Rolling 7/28-day totals are trailing elapsed durations, excluding their exact lower boundary and including the current completed draft sets once at the draft's start timestamp. Missed weeks contribute no work to totals but never create artificial zero-dose baseline sessions. Future and timezone-less historical timestamps are excluded. Days since last exposure is shown alongside.
 
 History cache: 60 seconds, up to 128 movements, invalidated for affected movements after a successful Hevy workout save. UI requests are debounced and stale responses cannot overwrite a newer draft. Stress is computed on request and never stored as a permanent historical score, allowing later model refinement to recalculate history consistently.
+
+The `/stress` dashboard opens with the main three movements and a selector for any cached exercise. It shows saved-session components, a calendar-time chart, current rolling totals, current session window, and a historical table with each workout's earlier-only session window, as-of-workout rolling totals, and estimated/unscored counts. History ranges are display filters only: older sessions are still used where needed to establish a baseline or trailing total. History is recalculated on read from all available Hevy/local data without changing source records or requiring a backfill. Warm-up-only sessions are excluded; working sets that cannot be scored remain visible as incomplete. Workouts sharing an identical timestamp do not establish precedence for each other's baseline. The dashboard includes saved history only; current draft metrics remain on `/log`. Navigation links are on Log, Progress, and RPE tables.
 
 ---
 

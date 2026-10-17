@@ -126,6 +126,10 @@ def build_summary(entries: list[dict], current_sets: list[dict], *, now: datetim
         groups[(entry.get("workout_id") or "", timestamp)].append(entry)
     sessions = [(key[1], session_score(sets)) for key, sets in groups.items()]
     current = session_score(current_sets)
+    return _summary_from_sessions(sessions, current, now, current_at)
+
+
+def _summary_from_sessions(sessions, current, now, current_at):
     baseline = [s for t, s in sessions if now - timedelta(days=BASELINE_DAYS) < t <= now and s["sets"]]
     values = [s["total"] for s in baseline]
     typical = median(values) if values else None
@@ -151,3 +155,42 @@ def build_summary(entries: list[dict], current_sets: list[dict], *, now: datetim
             "status": status, "rolling_7": rolling["7"], "rolling_28": rolling["28"],
             "days_since_last": (now - last).days if last else None,
             "as_of": now.isoformat()}
+
+
+def build_dashboard(entries: list[dict], *, now: datetime, days: int = 56) -> dict:
+    """Recalculate saved history without writes; historical windows have no look-ahead.
+
+    The display range never truncates the history used for rolling totals or a
+    session's preceding baseline. days=0 includes all available saved history.
+    Scores are computed once, shared by current totals and retrospective windows.
+    """
+    now = parse_time(now)
+    if now is None:
+        raise ValueError("now must include a timezone")
+    groups = defaultdict(list)
+    for entry in entries:
+        start = parse_time(entry.get("workout_start_time"))
+        if start is not None and start <= now:
+            groups[(entry.get("workout_id") or "", start)].append(entry)
+    ordered = sorted(groups.items(), key=lambda item: (item[0][1], item[0][0]))
+    scored = [(key, sets, session_score(sets)) for key, sets in ordered]
+    # Warm-up-only workouts are not movement exposures; invalid working sets remain visible.
+    scored = [(key, sets, score) for key, sets, score in scored if score["sets"] or score["skipped_sets"]]
+    current = _summary_from_sessions([(key[1], score) for key, _, score in scored], empty_score(), now, now)
+    cutoff = now - timedelta(days=days) if days else None
+    rows = []
+    prior = []
+    for key, sets, score in scored:
+        start = key[1]
+        if cutoff is None or start > cutoff:
+            # Workouts with an identical timestamp do not establish precedence.
+            earlier = [(t, s) for t, s in prior if t < start]
+            summary = _summary_from_sessions(earlier, score, start, start)
+            rows.append({"workout_id": key[0] or None, "title": sets[0].get("workout_title") or "Workout",
+                         "start_time": start.isoformat(), "score": score,
+                         "window": summary["window"], "status": summary["status"],
+                         "rolling_7": summary["rolling_7"], "rolling_28": summary["rolling_28"]})
+        prior.append((start, score))
+    return {"model_version": MODEL_VERSION, "as_of": now.isoformat(), "days": days,
+            "current": current, "sessions": rows, "available_sessions": len(scored),
+            "first_recorded_at": scored[0][0][1].isoformat() if scored else None}

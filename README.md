@@ -18,6 +18,7 @@ Deployed via Docker on CasaOS, used as a desktop and mobile PWA. It has no login
 - **RPE tables** (`/rpe-charts`) — for squat, bench and deadlift, a table of RPE by reps built from your own logged sets, next to the table in use. Each workout gets its own fitted e1RM (nothing is measured against the table's own numbers), and once a lift has enough data the cells you haven't hit are estimated from your other sets. A General tab shows the table every other movement shares. Read-only for now.
 - **Progress** (`/progress`) — each main lift's e1RM (Hevy history + the RPE table) against your 7-day average bodyweight (Apple Health via Hevy) and a DOTS-style strength score, so a cut can be told apart from lost strength. Set `DOTS_SEX=female` for the female coefficients (default male). The Hevy exercise each lift reads is `LIFT_TITLES` in `progress.py`.
 - **Recent workouts** (`/recent`) — your latest Hevy workouts.
+- **Movement stress** (`/stress`) — squat, bench, and deadlift overview plus a movement selector, central/peripheral breakdowns, rolling 7/28-day totals, and retrospective session history. Historical blank RPEs are marked as @5 estimates; saved workouts are not modified. The log shows only the compact session score and window.
 - **Legacy 5/3/1 planner** (`/legacy`) — the original programme designer for Wendler's 5/3/1 BBB with autoregulation (below). It is no longer the focus, and its settings page is where the Hevy API key is saved.
 
 ---

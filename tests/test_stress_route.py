@@ -59,6 +59,36 @@ class TestStressRoute(unittest.TestCase):
             self.assertEqual(422,response.status_code)
         self.hevy.exercise_history.assert_not_called()
 
+    def test_dashboard_retroactively_scores_history_and_shares_preview_cache(self):
+        response=self.client.get('/movement-stress/bench/history?days=0')
+        self.assertEqual(200,response.status_code,response.text)
+        data=response.json()
+        self.assertEqual('bench',data['exercise_template_id'])
+        self.assertEqual(1,data['available_sessions'])
+        self.assertEqual(1,data['sessions'][0]['score']['estimated_sets'])
+        self.assertIsNone(data['sessions'][0]['window']['median'])
+        self.client.post('/movement-stress/bench',json={'sets':[]})
+        self.hevy.exercise_history.assert_called_once_with('bench')
+        self.hevy.create_workout.assert_not_called()
+
+    def test_dashboard_catalog_identifies_main_lifts_and_retains_other_movements(self):
+        with main.get_db() as conn:
+            conn.executemany('INSERT INTO hevy_exercise_cache (id,title) VALUES (?,?)',[
+                ('sq',main.progress.LIFT_TITLES['squat']),('bp',main.progress.LIFT_TITLES['bench']),
+                ('dl',main.progress.LIFT_TITLES['deadlift']),('row','Pendlay Row (Barbell)')])
+        result=self.client.get('/stress/movements')
+        self.assertEqual(200,result.status_code,result.text)
+        values={r['id']:r['primary_key'] for r in result.json()}
+        self.assertEqual({'sq':'squat','bp':'bench','dl':'deadlift','row':None},values)
+        self.hevy.exercise_history.assert_not_called()
+
+    def test_dashboard_page_and_invalid_history_range(self):
+        response=self.client.get('/stress')
+        self.assertEqual(200,response.status_code)
+        self.assertIn('no-cache',response.headers['cache-control'])
+        self.assertEqual(422,self.client.get('/movement-stress/bench/history?days=-1').status_code)
+        self.hevy.exercise_history.assert_not_called()
+
 
 if __name__=='__main__':
     unittest.main()

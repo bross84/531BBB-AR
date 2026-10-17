@@ -273,6 +273,56 @@ class MovementStress(BaseModel):
     as_of: str
 
 
+class StressMovement(BaseModel):
+    id: str
+    title: str
+    primary_key: Literal["squat", "bench", "deadlift"] | None = None
+
+
+class HistoricalStress(BaseModel):
+    workout_id: str | None
+    title: str
+    start_time: str
+    score: StressScore
+    window: StressWindow
+    status: str
+    rolling_7: StressScore
+    rolling_28: StressScore
+
+
+class StressDashboard(BaseModel):
+    exercise_template_id: str
+    model_version: str
+    as_of: str
+    days: int
+    current: MovementStress
+    sessions: list[HistoricalStress]
+    available_sessions: int
+    first_recorded_at: str | None
+
+
+@app.get("/stress")
+def stress_dashboard_page():
+    return FileResponse("stress.html", headers=NO_CACHE)
+
+
+@app.get("/stress/movements", response_model=list[StressMovement])
+def stress_movements():
+    with get_db() as conn:
+        rows = conn.execute("SELECT id, title FROM hevy_exercise_cache ORDER BY title COLLATE NOCASE").fetchall()
+    primary = {progress.LIFT_TITLES[key]: key for key in ("squat", "bench", "deadlift")}
+    return [{"id": r["id"], "title": r["title"], "primary_key": primary.get(r["title"])} for r in rows]
+
+
+@app.get("/movement-stress/{exercise_template_id}/history", response_model=StressDashboard)
+def movement_stress_history(exercise_template_id: str, days: int = Query(56, ge=0, le=3650)):
+    entries = stress_service.history(exercise_template_id, lambda: _call_hevy(
+        lambda client: client.exercise_history(exercise_template_id)))
+    merged = stress_index.merge_history(entries, set_log.for_exercise(exercise_template_id))
+    return {"exercise_template_id": exercise_template_id,
+            **stress_index.build_dashboard(merged, now=datetime.now(timezone.utc), days=days)}
+
+
 @app.post("/movement-stress/{exercise_template_id}", response_model=MovementStress)
 def preview_movement_stress(exercise_template_id: str, data: StressInput):
     """Read-only preview: completed draft sets plus history, never a Hevy write."""

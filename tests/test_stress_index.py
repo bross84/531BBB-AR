@@ -101,3 +101,49 @@ class TestHistoryAndWindows(unittest.TestCase):
         self.assertEqual(0,result['rolling_7']['total'])
         self.assertGreater(result['rolling_28']['total'],0)
 
+
+class TestRetrospectiveDashboard(unittest.TestCase):
+    def test_old_sessions_are_recalculated_without_future_data_in_their_windows(self):
+        entries=[history(30,'first'),history(20,'second'),history(1,'later',reps=10,rpe=10)]
+        result=stress.build_dashboard(entries,now=NOW,days=0)
+        first,second,later=result['sessions']
+        self.assertEqual('first',first['workout_id'])
+        self.assertIsNone(first['window']['median'])
+        self.assertEqual(1,second['window']['sessions'])
+        self.assertAlmostEqual(first['score']['total'],second['window']['median'])
+        self.assertEqual(2,later['window']['sessions'])
+        self.assertEqual('much_higher',later['status'])
+
+    def test_display_range_keeps_earlier_baseline_and_rolling_work(self):
+        entries=[history(3,'latest'),history(9,'earlier'),history(30,'old')]
+        result=stress.build_dashboard(entries,now=NOW,days=7)
+        self.assertEqual(1,len(result['sessions']))
+        self.assertEqual(3,result['available_sessions'])
+        latest=result['sessions'][0]
+        self.assertEqual(2,latest['window']['sessions'])
+        one=stress.session_score([S()])['total']
+        self.assertAlmostEqual(2*one,latest['rolling_7']['total']) # day -9 is 6 days before latest
+        self.assertAlmostEqual(3*one,latest['rolling_28']['total'])
+        self.assertAlmostEqual(one,result['current']['rolling_7']['total'])
+
+    def test_snapshot_matches_live_history_summary_without_draft(self):
+        entries=[history(1,'first'),history(8,'second'),history(40,'third')]
+        self.assertEqual(stress.build_summary(entries,[],now=NOW),
+                         stress.build_dashboard(entries,now=NOW)['current'])
+
+    def test_estimates_skips_future_and_warmup_only_sessions(self):
+        entries=[history(2,'estimated',rpe=None),history(1,'invalid',w=0),
+                 history(-1,'future'),history(3,'warm',type='warmup')]
+        original=deepcopy(entries)
+        result=stress.build_dashboard(entries,now=NOW)
+        self.assertEqual(2,result['available_sessions'])
+        self.assertEqual(1,result['sessions'][0]['score']['estimated_sets'])
+        self.assertEqual(1,result['sessions'][1]['score']['skipped_sets'])
+        self.assertEqual(original,entries)
+
+    def test_no_workout_at_identical_timestamp_enters_the_others_baseline(self):
+        entries=[history(2,'a'),history(2,'b',rpe=9)]
+        result=stress.build_dashboard(entries,now=NOW)
+        self.assertTrue(all(s['window']['sessions']==0 for s in result['sessions']))
+        self.assertEqual(2,result['current']['window']['sessions'])
+
