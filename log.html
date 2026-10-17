@@ -199,6 +199,20 @@
     /* while you type, the on-screen keyboard covers much of the screen: give the page room to scroll above it and hide the bottom bar */
     body.typing .bar { display: none; }
     body.typing main { padding-bottom: 60vh; }
+    body.keypad-open .bar { display: none; }
+    body.keypad-open main { padding-bottom: calc(var(--keypad-height, 250px) + 32px); }
+    .numberpad { position: fixed; bottom: 0; left: 0; right: 0; z-index: 9; background: var(--card); border-top: 1px solid var(--line); box-shadow: 0 -4px 20px rgba(0,0,0,.12); padding: 6px 12px calc(8px + env(safe-area-inset-bottom)); }
+    .numberpad > div { max-width: 520px; margin: auto; }
+    .padheading { display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px; font-size: 13px; }
+    .padheading span { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .padheading strong { flex-shrink: 0; }
+    .padkeys { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(80px, 1fr); gap: 4px; }
+    .padkeys button { height: 44px; min-height: 44px; padding: 0; border: 0; background: var(--chip); font-size: 22px; touch-action: manipulation; user-select: none; }
+    .padkeys button[data-pad-key="0"] { grid-column: span 2; }
+    .padkeys button.pad-action { font-size: 15px; color: var(--accent); }
+    .padkeys button:disabled { opacity: .3; }
+    .padkeys button:active { filter: brightness(.9); }
+    .padkeys button.primary { background: var(--accent); color: var(--card); }
     [hidden] { display: none !important; }
 
     .page-heading { display:flex; align-items:center; gap:8px; min-width:0; }
@@ -269,6 +283,18 @@
     <div id="results"></div>
   </div>
 </div>
+
+<section id="numberpad" class="numberpad" aria-label="Workout number pad" hidden>
+  <div>
+    <div class="padheading"><strong id="padField"></strong><span id="padContext"></span></div>
+    <div class="padkeys">
+      <button type="button" data-pad-key="1">1</button><button type="button" data-pad-key="2">2</button><button type="button" data-pad-key="3">3</button><button type="button" class="pad-action" data-pad-key="backspace" aria-label="Backspace">⌫</button>
+      <button type="button" data-pad-key="4">4</button><button type="button" data-pad-key="5">5</button><button type="button" data-pad-key="6">6</button><button type="button" class="pad-action" data-pad-key="clear">Clear</button>
+      <button type="button" data-pad-key="7">7</button><button type="button" data-pad-key="8">8</button><button type="button" data-pad-key="9">9</button><button type="button" class="pad-action" data-pad-key="next">Next</button>
+      <button type="button" data-pad-key="." aria-label="Decimal point">.</button><button type="button" data-pad-key="0">0</button><button type="button" class="pad-action primary" data-pad-key="done">Done</button>
+    </div>
+  </div>
+</section>
 
 <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(function () {});</script>
 <script>
@@ -767,6 +793,7 @@
 
   // ── Workout screen ──────────────────────────────────────────────────────────
   function renderWorkout() {
+    closeNumberPad();
     const stay = !$("workout").hidden, y = window.scrollY;   // redrawing the workout you are already on keeps your place
     show("workout");
     $("title").value = draft.title;
@@ -1120,7 +1147,7 @@
     const previous = (ex.ref.state && ex.ref.state.previous) || [];
     const prevWarm = previous.filter((p) => p.type === "warmup"), prevWork = previous.filter((p) => p.type !== "warmup");
     let working = 0, warm = 0;
-    ex.sets.forEach((s) => {
+    ex.sets.forEach((s, idx) => {
       if (s.type === "warmup") warm += 1; else working += 1;
       const p = s.type === "warmup" ? prevWarm[warm - 1] : prevWork[working - 1];
       const row = el("div", "set" + (s.done ? " done" : ""));
@@ -1136,6 +1163,7 @@
 
       const prevCell = el("span", "prev", p ? trim(p.weight_lb) + "\u00d7" + (p.reps ?? "?") + (p.rpe != null ? " @" + p.rpe : "") : "");
       const wt = el("input"); wt.type = "text"; wt.inputMode = "decimal"; wt.setAttribute("aria-label", "Weight in " + (unit === "lb" ? "pounds" : "kilograms"));
+      prepareKeypadInput(wt, true, ex.title + " · Set " + (idx + 1));
       const refCell = el("span", "refcol");
       primaryInputs.set(s, wt); refCells.set(s, refCell); wt.value = primaryText(s); refCell.textContent = refText(s);
       wt.addEventListener("input", () => {
@@ -1148,6 +1176,7 @@
       });
       wt.addEventListener("blur", () => showWeight(s));
       const reps = el("input"); reps.type = "text"; reps.inputMode = "numeric"; reps.value = s.reps; reps.setAttribute("aria-label", "Reps");
+      prepareKeypadInput(reps, false, ex.title + " · Set " + (idx + 1));
       reps.addEventListener("input", () => { s.reps = reps.value; applyAuto(ex, s.done ? null : s); saveDraft(); });
 
       const rpe = rpeControl(s.done ? (s.arpe || s.rpe) : s.rpe, (v) => {
@@ -1481,17 +1510,104 @@
   showUnit();
 
   // ── Typing ───────────────────────────────────────────────────────────────────
-  // Tapping a weight or reps box opens the on-screen keyboard, which is huge in landscape. Hide the bottom bar, leave room to
-  // scroll the last row above the keyboard, and lift the box you tapped into the part of the screen that stays visible.
+  // Touch weight/reps entry uses one layout; desktop keeps its normal keyboard.
+  function numberPadEdit(value, start, end, key, decimal) {
+    if (key === "clear") return { value: "", caret: 0 };
+    if (key === "backspace") {
+      const from = start === end ? Math.max(0, start - 1) : start;
+      return { value: value.slice(0, from) + value.slice(end), caret: from };
+    }
+    if (!/^[0-9.]$/.test(key) || (key === "." && !decimal)) return null;
+    const text = value.slice(0, start) + key + value.slice(end);
+    if (!(decimal ? /^\d*[.,]?\d*$/ : /^\d*$/).test(text)) return null;
+    return { value: text, caret: start + 1 };
+  }
+  function prepareKeypadInput(input, decimal, context) {
+    input.dataset.keypad = decimal ? "decimal" : "integer";
+    input.dataset.padContext = context;
+    input.autocomplete = "off";
+    const mode = decimal ? "decimal" : "numeric";
+    input.inputMode = window.matchMedia("(pointer: coarse)").matches ? "none" : mode;
+    input.addEventListener("pointerdown", (e) => {
+      // A hybrid computer can have a mouse and a touch screen.
+      input.inputMode = e.pointerType === "touch" || e.pointerType === "pen" ? "none" : mode;
+      if (input === padInput && input.inputMode !== "none") closeNumberPad();
+    });
+    input.addEventListener("focus", () => {
+      if (input.inputMode === "none" && padInput !== input) openNumberPad(input);
+    });
+    input.addEventListener("click", () => {
+      if (input.inputMode === "none" && padInput !== input) openNumberPad(input);
+    });
+    input.addEventListener("keydown", (e) => {
+      if (padInput === input && e.key === "Escape") { e.preventDefault(); input.blur(); closeNumberPad(); }
+    });
+  }
+  const numberpad = $("numberpad");
+  let padInput = null;
+  function padInputs() { return Array.from(document.querySelectorAll("#exercises input[data-keypad]")); }
+  function sizeNumberPad() {
+    if (!padInput) return;
+    document.body.style.setProperty("--keypad-height", numberpad.offsetHeight + "px");
+    liftIntoView(padInput);
+  }
+  function openNumberPad(input) {
+    padInput = input;
+    numberpad.hidden = false;
+    document.body.classList.remove("typing");
+    document.body.classList.add("keypad-open");
+    $("padField").textContent = input.getAttribute("aria-label");
+    $("padContext").textContent = input.dataset.padContext;
+    numberpad.querySelector('[data-pad-key="."]').disabled = input.dataset.keypad !== "decimal";
+    numberpad.querySelector('[data-pad-key="next"]').disabled = padInputs().at(-1) === input;
+    input.select();
+    requestAnimationFrame(sizeNumberPad);
+  }
+  function closeNumberPad() {
+    padInput = null;
+    numberpad.hidden = true;
+    document.body.classList.remove("keypad-open");
+  }
+  numberpad.addEventListener("pointerdown", (e) => {
+    if (e.target.closest("button")) e.preventDefault(); // keep input focus, caret and selection
+  });
+  numberpad.addEventListener("click", (e) => {
+    const button = e.target.closest("button[data-pad-key]");
+    if (!button || button.disabled || !padInput) return;
+    if (!padInput.isConnected) { closeNumberPad(); return; }
+    const key = button.dataset.padKey, input = padInput;
+    if (key === "done") { input.blur(); closeNumberPad(); return; }
+    if (key === "next") {
+      const inputs = padInputs(), next = inputs[inputs.indexOf(input) + 1];
+      if (next) { next.inputMode = "none"; next.focus(); }
+      return;
+    }
+    input.focus({ preventScroll: true });
+    const edit = numberPadEdit(input.value, input.selectionStart ?? input.value.length, input.selectionEnd ?? input.value.length, key, input.dataset.keypad === "decimal");
+    if (!edit) return;
+    input.value = edit.value;
+    input.setSelectionRange(edit.caret, edit.caret);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  document.addEventListener("pointerdown", (e) => {
+    if (padInput && !numberpad.contains(e.target) && !e.target.closest("input[data-keypad]")) closeNumberPad();
+  });
+  document.addEventListener("focusout", () => {
+    setTimeout(() => { if (padInput && document.activeElement !== padInput && !numberpad.contains(document.activeElement)) closeNumberPad(); }, 0);
+  });
+  window.addEventListener("resize", () => { if (padInput) requestAnimationFrame(sizeNumberPad); });
+
+  // Other text fields retain the system keyboard and its existing scrolling behavior.
   let typingTimer = null;
   function liftIntoView(input) {
     if (document.activeElement !== input) return;
-    const vv = window.visualViewport, visible = vv ? vv.height : window.innerHeight;
+    const vv = window.visualViewport, visible = (vv ? vv.height : window.innerHeight) - (padInput ? numberpad.offsetHeight : 0);
     const top = input.getBoundingClientRect().top, want = visible * 0.3;   // a little way down, so the next sets show below it
     if (Math.abs(top - want) > 40) window.scrollBy({ top: top - want, behavior: "smooth" });
   }
   document.addEventListener("focusin", (e) => {
     if (!e.target.matches || !e.target.matches("#exercises input")) return;
+    if (e.target.inputMode === "none") return;
     clearTimeout(typingTimer);
     document.body.classList.add("typing");
     setTimeout(() => liftIntoView(e.target), 350);   // after the keyboard has finished opening
