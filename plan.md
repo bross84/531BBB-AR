@@ -529,7 +529,7 @@ Newest entries at the top. Each completed task is logged here with workflow, fil
 
 ### Scaffold
 - **Workflow:** Express
-- **Files committed:** `main.py`, `database.py`, `wave_math.py`, `docker-compose.yml`, `Dockerfile`, `requirements.txt`, `index.html`, `CLAUDE.md`, `docs/531bbb-context.md`, `docs/copilot-context.md`
+- **Files committed:** `main.py`, `database.py`, `wave_math.py`, `docker-compose.yml`, `Dockerfile`, `requirements.txt`, `index.html`, `CLAUDE.md`, `docs/531bbb-context.md`, `docs/development.md` (development guidance, subsequently renamed)
 - **Summary:** Initial project scaffold committed. FastAPI app with `/health` route and lifespan `init_db()`. Full SQLite schema defined in `database.py`. Pure wave math functions in `wave_math.py`. Placeholder `index.html`. Docker + CasaOS compose config on port 8126.
 - **Status:** COMPLETED
 

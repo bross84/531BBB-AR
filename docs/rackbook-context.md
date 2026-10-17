@@ -138,7 +138,7 @@ Reference the user pointed to: the RTS article on customising an RPE chart (http
 
 ## Movement stress (2026-10-17)
 
-`/log` shows a live score for each movement from its ticked sets only. The same backend calculation scores history. Warm-ups do not count. Variants remain separate Hevy template ids; duplicate cards for one template share the aggregate movement score. A draft is a new exposure, not the source workout it was copied from.
+`/log` shows a compact two-line display: session stress from ticked sets, and the session window with its comparison label. Rolling totals, components, and history details remain calculated and available in the API but are hidden on the card to preserve space for sets. The same backend calculation scores history. Warm-ups do not count. Variants remain separate Hevy template ids; duplicate cards for one template share the aggregate movement score. A draft is a new exposure, not the source workout it was copied from.
 
 `rackbook-stress-v1` is an RTS-inspired training-dose estimate. It uses the heaviest usable set and a fixed default rep-max curve as its reference, independently of the user's loading chart, TS, TM, and LSe1RM. Ties use higher RPE, then fewer reps, so reordering does not change the score. For relative load I: CS = reps × 10^-6 × exp(14.72311 × I); PS = 0.5365534125622946 × I × sum(1.23927^(RPE − 10 − j), j=0..reps−1); total = (PS + CS)/2. Missing RPE is estimated @5, explicitly authorized by Brian for his easy/unrated sets; exact local RPE always wins. These fitted constants are a versioned starting convention, not a claim to reproduce RTS or measure physiological fatigue directly. A missing/invalid weight, reps or uncovered curve point is skipped and surfaced, not silently treated as a measured zero.
 
@@ -202,7 +202,7 @@ Programs are program-agnostic: tiers (behaviours `percentage`, `fixed`, `progres
 | Schema changes | New tables in the `CREATE TABLE IF NOT EXISTS` block, new columns as `ALTER TABLE` in `init_db()`; verify with `PRAGMA table_info`. |
 | Table values | Nothing in the RPE tables view may be filled in from the table in use; estimates come from the user's sets only. |
 | Deletions | No permanent deletions without explicit written instruction. Hide or retire things rather than delete (the user's preference). |
-| Commits (Copilot) | The Copilot implementer does not `git commit` or `git push`. Brian commits after review. (The architect, i.e. Claude, may commit and push finished work; see `CLAUDE.md`.) |
+| Commits | The coding assistant may commit and push finished work. Use conventional commits, one logical change each, and run the full suite before pushing. |
 
 ---
 
@@ -235,4 +235,4 @@ Local Docker on Windows (Docker Desktop) also works with the same compose file; 
 
 ## Development workflow
 
-**Claude** (architect, writes and commits finished work) → **Copilot** (implementer for routine tasks, reads [`copilot-context.md`](copilot-context.md)) → **Brian** (reviewer). Other AI tools: read this file, `CLAUDE.md` / `AGENTS.md`, and `backlog.md`.
+The coding assistant handles architecture, implementation, debugging, and validation directly; Brian reviews and checks the result on his phone. Read this file, `CLAUDE.md` / `AGENTS.md`, `backlog.md`, and [`development.md`](development.md).

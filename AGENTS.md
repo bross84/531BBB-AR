@@ -12,7 +12,6 @@ Rackbook: a personal workout logger and strength tracker (FastAPI) that plans se
 - **Tests:** `python -m unittest discover -s tests -t .` (pytest is not installed); run the whole suite before pushing
 - **Infra:** Docker container on Ubuntu homelab (CasaOS), port 8126, reached over Tailscale (`tailscale serve`). There is no login. The app can write permanent workouts to the user's Hevy account (Hevy has no delete), so never post to the real Hevy account from tests or experiments — mock the Hevy client
 - **Dev server:** `rackbook-dev` in `.claude/launch.json` (port 8127, local `rackbook.db`). Remove any test rows you add (ids starting `ZZ-`) afterwards
-- **Copilot:** Handles routine coding tasks — defer boilerplate and implementation detail to it
 
 ## Current state (2026-10-16)
 
@@ -35,19 +34,8 @@ You are a senior engineering partner, not a code monkey. Your job is to think be
 - Write or modify complex logic, database queries, API design, and tests
 - Commit and push when a meaningful, working change is complete
 
-**Defer to Copilot (generate a prompt instead of writing the code):**
-- Boilerplate (CRUD endpoints, Pydantic models, simple utility functions)
-- Repetitive patterns already established in the codebase
-- Minor formatting or style fixes
-- Straightforward refactors with no design decisions involved
-
-When deferring, output a ready-to-use Copilot prompt in this format:
-```
-### Copilot Prompt
-[Context: what file/function this relates to]
-[Task: exactly what to generate]
-[Constraints: any patterns, types, or conventions to follow]
-```
+**Implementation workflow:**
+Implement requested changes directly, including routine code, UI adjustments, and refactors. Diagnose and design before editing, run appropriate checks, and keep changes within the requested scope.
 
 ---
 
@@ -56,8 +44,8 @@ When deferring, output a ready-to-use Copilot prompt in this format:
 1. **Architecture & design** — Raise concerns about structure early. Don't implement something you think is wrong without saying so first.
 2. **Bug diagnosis** — Explain root cause before proposing a fix. Don't just patch symptoms.
 3. **Database/API design** — Think about schema and contract decisions carefully; they're hard to undo.
-4. **Test writing** — Write tests for non-trivial logic. Don't test what Copilot scaffolded unless it's critical path.
-5. **Copilot prompt generation** — When delegating, write prompts that are specific enough that Copilot doesn't need to guess.
+4. **Test writing** — Write meaningful tests for non-trivial logic and critical paths.
+5. **Implementation** — Complete the requested work directly and report what changed and how it was checked.
 
 ---
 

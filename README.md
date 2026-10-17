@@ -128,7 +128,7 @@ The full schema is in `database.py`.
 | DB access | `sqlite3` stdlib only. No SQLAlchemy, no Alembic. |
 | Frontend | Vanilla JS, one self-contained HTML file per page. No bundler, no build step. |
 | DB path | Read from `os.environ` as `DB_PATH`. Never hardcode. |
-| Commits (Copilot) | Copilot does not run `git commit` or `git push`. Brian commits after review. |
+| Commits | Conventional commits, one logical change each. Push only after the required tests pass. |
 | Deletions | No permanent deletions without explicit written instruction. |
 | Column names | Always verify with `PRAGMA table_info`. Never assume. |
 
@@ -136,9 +136,9 @@ The full schema is in `database.py`.
 
 ## Development model
 
-**Claude** (architect / reviewer) → **Copilot** (implementer) → **Brian** (reviewer / committer)
+The coding assistant handles design, implementation, and validation directly. Brian reviews the result and checks it on his phone.
 
-[`docs/rackbook-context.md`](docs/rackbook-context.md) and [`docs/copilot-context.md`](docs/copilot-context.md) are read by the Copilot agent at the start of every task.
+Read [`docs/rackbook-context.md`](docs/rackbook-context.md), [`docs/backlog.md`](docs/backlog.md), and [`docs/development.md`](docs/development.md) for project context and the development workflow.
 
 Tests: `python -m unittest discover -s tests -t .`
 
