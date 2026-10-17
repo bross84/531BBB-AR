@@ -335,14 +335,13 @@
     .workout-log .padkeys button { border-radius: 10px; font-weight: 550; }
     .workout-log .padkeys button.pad-action { font-weight: 600; }
     @media (min-width: 600px) {
-      .workout-log .cols, .workout-log .set { grid-template-columns: 24px 60px minmax(0,1fr) 32px minmax(0,1fr) 64px 38px 36px; gap: 4px; }
+      .workout-log .cols, .workout-log .set { grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 4px; }
       .workout-log .set .tick { width: 32px; height: 32px; }
     }
     @media (min-width: 900px) {
       .workout-log main { padding-bottom: 110px; }
       .workout-log #exercises .card { grid-template-columns: 180px minmax(0,1fr); column-gap: 24px; padding: 20px; }
       .workout-log .exleft { padding-top: 24px; margin-bottom: 0; }
-      .workout-log .cols, .workout-log .set { grid-template-columns: 28px 72px minmax(74px,1fr) 40px minmax(58px,.8fr) 78px 46px 40px; }
       .workout-log .tile { min-height: 62px; }
     }
     @media (pointer: coarse) {
