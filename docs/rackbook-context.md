@@ -39,6 +39,8 @@ Brian lifts 3 days a week and logs on his phone in the gym. He works up to a sin
 
 ## Pages and routes
 
+The five main pages share an inline `rackbook-theme` style block for the blue/slate light/dark palette, cards, controls, page titles and navigation. Each includes the same six destinations with `aria-current="page"` on the active page; the legacy/settings page keeps its existing navigation and theme selector with matching colors. Keep the common rules in step across pages. The log's additional rules retain the 900px landscape split layout, allow portrait tablets to use available width, and increase touch input heights. Existing hidden states, keyboard modes, scoring and saving behavior are unchanged. Browser theme colors and the PWA manifest follow the palette.
+
 | Page | File | What it is |
 |---|---|---|
 | `/log` | `log.html` | The workout log. The main page. |

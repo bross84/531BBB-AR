@@ -421,6 +421,25 @@
     .page-back:disabled { opacity:.4; cursor:default; }
     .page-back:focus-visible { outline:2px solid var(--accent,currentColor); outline-offset:2px; }
   </style>
+  <style id="rackbook-theme">
+    :root {
+      --bg: #111923; --bg-elev: #1a2533; --bg-soft: #243246; --bg-mute: #202d3d;
+      --text: #e8eef8; --muted: #a5b4c9; --border: #344358; --accent: #95baff;
+      --radius: 16px; --shadow: 0 4px 20px rgba(0,0,0,.12);
+    }
+    html[data-theme="light"] {
+      --bg: #f3f5f8; --bg-elev: #ffffff; --bg-soft: #f7f9fc; --bg-mute: #edf1f7;
+      --text: #17243a; --muted: #59687c; --border: #dce3ec; --accent: #2459b8;
+      --shadow: 0 2px 5px rgba(23,36,58,.025), 0 10px 28px rgba(23,36,58,.035);
+    }
+    body { background: var(--bg); -webkit-font-smoothing: antialiased; }
+    .topbar, .panel { border-radius: 16px; }
+    .btn.primary { background: var(--accent); color: var(--bg); border-color: transparent; }
+    .tab[aria-selected="true"] { background: var(--bg-soft); color: var(--accent); border-color: var(--accent); }
+    .dot { background: var(--accent); box-shadow: none; }
+    h1, h2 { letter-spacing: -.025em; }
+    :where(button, a, input, select):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  </style>
 </head>
 <body>
   <div class="app">

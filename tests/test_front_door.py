@@ -70,8 +70,8 @@ class TestFrontDoor(unittest.TestCase):
             self.assertIn('rel="manifest" href="/manifest.webmanifest"', html, path)
             self.assertIn('rel="apple-touch-icon" href="/static/apple-touch-icon.png"', html, path)
             # the browser bar follows the system light/dark setting, like the page itself
-            self.assertIn('media="(prefers-color-scheme: light)" content="#f6f5f1"', html, path)
-            self.assertIn('media="(prefers-color-scheme: dark)" content="#161614"', html, path)
+            self.assertIn('media="(prefers-color-scheme: light)" content="#f3f5f8"', html, path)
+            self.assertIn('media="(prefers-color-scheme: dark)" content="#111923"', html, path)
         self.assertEqual(200, self.client.get("/static/apple-touch-icon.png").status_code)
 
     def test_a_service_worker_is_served_from_the_root_and_the_pages_register_it(self):
