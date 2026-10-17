@@ -98,6 +98,18 @@
     .set .rpebtn { width: 100%; height: 34px; min-height: 34px; background: var(--chip); border-radius: 8px; text-align: center; font-size: 16px; font-weight: 500; color: var(--text); }
     .set .rpebtn.none { color: var(--muted); font-weight: 400; }
     .set.done .rpebtn { background: transparent; }
+    .rpecontrol { min-width: 0; }
+    .set .rpeinput, .rpearrow { display: none; }
+    @media (hover: hover) and (pointer: fine) {
+      .cols, .set { grid-template-columns: 20px 52px minmax(0, 1fr) 32px minmax(0, 1fr) 60px 32px 26px; }
+      .rpecontrol { display: flex; align-items: center; border-radius: 8px; background: var(--chip); }
+      .set.done .rpecontrol { background: transparent; }
+      .set .rpeinput { display: block; min-width: 0; flex: 1; }
+      .set .rpeinput[aria-invalid="true"] { box-shadow: inset 0 0 0 1.5px var(--danger); }
+      .set .rpebtn { width: 18px; flex: 0 0 18px; color: var(--muted); }
+      .rpevalue { display: none; }
+      .rpearrow { display: inline; }
+    }
     .scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, .45); z-index: 10; display: flex; align-items: flex-end; justify-content: center; }
     .sheet { background: var(--card); border-radius: 16px 16px 0 0; padding: 14px 14px calc(14px + env(safe-area-inset-bottom)); width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto; }
     .sheet h2 { font-size: 17px; font-weight: 500; margin: 0 0 2px; }
@@ -272,8 +284,46 @@
     failure: ["Failure", "Taken to failure"],
     dropset: ["Drop set", "Weight dropped, straight after the last set"],
   };
-  // The RPE box is a button that opens a big tap-friendly picker; the browser's own dropdown is cramped on a tablet.
-  function showRpe(btn, v) { btn.value = v || ""; btn.textContent = v ? String(v) : "–"; btn.classList.toggle("none", !v); }
+  // Desktop supports typing; touch keeps the full-size picker button.
+  function showRpe(control, v) { control.show(v); }
+  function rpeControl(value, onChange) {
+    const control = el("div", "rpecontrol");
+    const input = el("input", "rpeinput");
+    input.type = "text"; input.inputMode = "decimal"; input.placeholder = "–";
+    input.setAttribute("aria-label", "RPE"); input.title = "RPE 4–10, in steps of 0.5; leave blank if unrated";
+    const picker = el("button", "rpebtn"); picker.type = "button";
+    picker.setAttribute("aria-label", "Choose RPE"); picker.setAttribute("aria-haspopup", "dialog");
+    picker.title = "Open RPE picker";
+    const label = el("span", "rpevalue"), arrow = el("span", "rpearrow", "▾");
+    picker.append(label, arrow);
+    let committed = "";
+    control.show = (v) => {
+      committed = v || ""; input.value = committed;
+      input.setCustomValidity(""); input.removeAttribute("aria-invalid");
+      label.textContent = committed || "–"; picker.classList.toggle("none", !committed);
+    };
+    input.addEventListener("input", () => {
+      const raw = input.value.trim().replace(",", ".");
+      const valid = raw === "" || (/^\d+(?:\.\d*)?$/.test(raw) && RPES.includes(Number(raw)));
+      input.setCustomValidity(valid ? "" : "Enter an RPE from 4 to 10 in steps of 0.5, or leave it blank.");
+      if (!valid) { input.setAttribute("aria-invalid", "true"); return; }
+      input.removeAttribute("aria-invalid");
+      committed = raw === "" ? "" : String(Number(raw));
+      label.textContent = committed || "–"; picker.classList.toggle("none", !committed);
+      onChange(committed);
+    });
+    input.addEventListener("blur", () => { if (input.checkValidity()) input.value = committed; });
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); if (input.reportValidity()) input.blur(); }
+      if (e.key === "Escape") { e.preventDefault(); control.show(committed); input.blur(); }
+    });
+    picker.addEventListener("click", () => pickRpe(committed, (v) => {
+      control.show(v); onChange(v); picker.focus();
+    }));
+    control.append(input, picker); control.show(value);
+    control.reportValidity = () => input.reportValidity();
+    return control;
+  }
   // A bottom sheet of big buttons. items: [{ v, label, desc, on }]; picking one closes the sheet and calls onPick(v).
   function openSheet(title, hint, items, cols, onPick) {
     const scrim = el("div", "scrim");
@@ -1100,14 +1150,11 @@
       const reps = el("input"); reps.type = "text"; reps.inputMode = "numeric"; reps.value = s.reps; reps.setAttribute("aria-label", "Reps");
       reps.addEventListener("input", () => { s.reps = reps.value; applyAuto(ex, s.done ? null : s); saveDraft(); });
 
-      const rpe = el("button", "rpebtn"); rpe.type = "button"; rpe.setAttribute("aria-label", "RPE");
-      showRpe(rpe, s.done ? (s.arpe || s.rpe) : s.rpe);
-      rpe.addEventListener("click", () => pickRpe(rpe.value, (v) => {
-        showRpe(rpe, v);
+      const rpe = rpeControl(s.done ? (s.arpe || s.rpe) : s.rpe, (v) => {
         if (s.done) { s.arpe = v; applyAuto(ex); }           // the RPE you logged: the weight stays
         else { s.rpe = v; applyAuto(ex, s); }                // the plan: the weight follows it
         saveDraft();
-      }));
+      });
 
       const e1Cell = el("span", "setE1");
       setE1Cells.set(s, e1Cell);
@@ -1117,6 +1164,7 @@
       const tick = el("button", "tick", "✓");
       tick.type = "button"; tick.setAttribute("aria-label", "Mark set done");
       tick.addEventListener("click", () => {
+        if (!rpe.reportValidity()) return;
         s.done = !s.done;
         if (s.done && !s.arpe) s.arpe = s.rpe;   // from here the RPE box is the RPE you logged
         row.classList.toggle("done", s.done);
@@ -1283,6 +1331,8 @@
 
   // ── Finish ──────────────────────────────────────────────────────────────────
   function buildEntry() {
+    const invalidRpe = document.querySelector('.rpeinput[aria-invalid="true"]');
+    if (invalidRpe) { invalidRpe.reportValidity(); throw new Error("Correct the highlighted RPE before saving (4–10 in steps of 0.5)."); }
     const exercises = [];
     for (const ex of draft.exercises) {
       const sets = [];

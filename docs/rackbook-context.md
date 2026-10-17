@@ -15,6 +15,8 @@ One user (Brian), one Hevy account. The app has no login; it is meant to sit on 
 
 ### How it is used
 
+On desktop (a mouse/fine pointer), the log's RPE field accepts direct numeric entry, with an adjacent arrow for the existing popup picker. Touch devices retain the full-size picker button. Both use RPE 4–10 in steps of 0.5, or blank for unrated. Invalid typed input blocks ticking and saving until corrected; Enter finishes editing and Escape returns to the last accepted value. This changes only entry: unticked RPE plans the weight, and completed-set RPE records the actual effort without changing its weight. Run `node tests/test_log_rpe_entry.cjs` for the standalone frontend regression checks.
+
 Brian lifts 3 days a week and logs on his phone in the gym. He works up to a single (a 1 @7 or 1 @8) on his primary squat and bench each session, marks it as the **TS**, and does back-off sets of 5 at lower RPEs. Day 1: squat, bench, Pendlay rows (plus a deadlift single). Day 2: a supplementary squat (a different Hevy exercise), press, stiff-legged deadlifts. Day 3: deadlift, bench, squat. The goal behind the RPE tables is a personal RPE chart per main lift that fills in over months from real sets.
 
 ---

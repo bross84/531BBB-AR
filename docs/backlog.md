@@ -30,6 +30,8 @@ The gym is the garage on the home network, so none of this blocks use there.
 
 ## Done recently
 
+- Desktop RPE entry (2026-10-17): type directly into the RPE field, or open the existing popup with its arrow. Accepts 4–10 in half-point steps and blank; invalid entries are highlighted and block ticking/saving until corrected. Enter finishes editing and Escape restores the last accepted value. Planned RPE still plans the weight; completed-set RPE keeps the logged weight. Touch devices keep the full-size popup button. Regression checks: `node tests/test_log_rpe_entry.cjs`.
+
 - Historical session window on the stress chart (2026-10-17): shaded 80–120% total-stress bands use each workout's earlier-only baseline, with red total points above usual and hollow points below. Missing baselines break the band; a single known range is still shown. All six app pages now have a Back button: same-origin browser history when available, otherwise the workout log; Back is disabled on a directly opened root/log page with no prior app page.
 
 - Stress dashboard (2026-10-17), `/stress`: main squat/bench/deadlift overview plus a selector for any cached movement; saved-session total/peripheral/central history, current session window, rolling 7/28-day totals, estimate coverage and history ranges (8 weeks, 6 months, one year, all). Historical windows use only sessions before the assessed workout. Scores are recalculated retroactively from Hevy plus exact local snapshots, with blank RPE estimated @5, no backfill or changes to saved workouts. The workout log stays compact. Draft sets are only included on `/log`, not in the saved-history dashboard.
