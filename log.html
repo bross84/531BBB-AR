@@ -33,6 +33,15 @@
     a { color: var(--accent); }
     .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin: 0 0 12px; }
     .muted { color: var(--muted); font-size: 13px; }
+    .stress { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 13px; }
+    .stress h3 { margin: 0 0 8px; font-size: 14px; font-weight: 500; }
+    .stress-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    .stress-grid span { display: block; color: var(--muted); font-size: 11px; }
+    .stress-grid strong { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
+    .stress p { margin: 6px 0 0; overflow-wrap: anywhere; }
+    .stress details { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .stress summary { cursor: pointer; min-height: 32px; display: list-item; padding: 6px 0; }
+    .stress[data-status="elevated"] h3, .stress[data-status="much_higher"] h3 { color: #b57216; }
     button, select, input {
       font: inherit; color: var(--text); min-height: 44px; border-radius: 10px; border: 1px solid var(--line);
       background: var(--card);
@@ -306,6 +315,7 @@
   try { if (localStorage.getItem("unit") === "lb") unit = "lb"; } catch (e) {}
   let rpeTable = new Map(), refs = {};
   const primaryInputs = new WeakMap(), refCells = new WeakMap(), refTimers = {}, cardEls = new Map();
+  const stressStates = new Map(); // transient results, never written into the workout or localStorage
 
   function el(tag, cls, text) { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
   function uid() { return (crypto.randomUUID && crypto.randomUUID()) || String(Date.now()) + Math.random(); }
@@ -315,8 +325,97 @@
   function saveDraft() {
     try { localStorage.setItem(KEY, JSON.stringify(draft)); } catch (e) {}
     if (draft) draft.exercises.forEach((ex) => { refreshE1rm(ex); refreshLoader(ex); });
+    if (draft) new Set(draft.exercises.map((ex) => ex.template_id)).forEach(queueStress);
   }
-  function clearDraft() { draft = null; try { localStorage.removeItem(KEY); } catch (e) {} restStop(); }
+  function clearDraft() {
+    draft = null; try { localStorage.removeItem(KEY); } catch (e) {} restStop();
+    for (const state of stressStates.values()) clearTimeout(state.timer);
+    stressStates.clear();
+  }
+
+  // Only completed sets count. The endpoint shares the calculation with historical scoring.
+  function stressBody(templateId) {
+    const sets = [];
+    for (const ex of draft.exercises.filter((e) => e.template_id === templateId)) {
+      for (const s of ex.sets.filter((s) => s.done)) {
+        const kg = num(s.kg), reps = Number(s.reps), logged = s.arpe || s.rpe;
+        sets.push({ type: s.type, weight_kg: Number.isFinite(kg) && kg >= 0 ? kg : null,
+          reps: String(s.reps).trim() && Number.isInteger(reps) && reps >= 0 ? reps : null,
+          rpe: logged ? Number(logged) : null });
+      }
+    }
+    return { sets, session_start: draft.startedAt };
+  }
+
+  function paintStress(templateId) {
+    if (!draft) return;
+    for (const ex of draft.exercises.filter((e) => e.template_id === templateId)) {
+      const card = cardEls.get(ex.id), box = card && card.querySelector(".stress");
+      if (box) fillStress(box, templateId);
+    }
+  }
+
+  function queueStress(templateId) {
+    if (!draft || !templateId) return;
+    const body = stressBody(templateId), key = JSON.stringify(body);
+    let state = stressStates.get(templateId);
+    if (!state) { state = { key: null, version: 0 }; stressStates.set(templateId, state); }
+    if (state.key === key && (state.pending || Date.now() - state.updated < 60000)) return;
+    state.key = key; state.pending = true; state.error = null;
+    const version = ++state.version, startedAt = draft.startedAt;
+    clearTimeout(state.timer); paintStress(templateId);
+    state.timer = setTimeout(async () => {
+      try {
+        const result = await api("/movement-stress/" + encodeURIComponent(templateId), {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: key,
+        });
+        if (!draft || draft.startedAt !== startedAt || state.version !== version || stressStates.get(templateId) !== state) return;
+        state.result = result; state.error = null;
+      } catch (err) {
+        if (!draft || draft.startedAt !== startedAt || state.version !== version || stressStates.get(templateId) !== state) return;
+        state.error = err.message;
+      }
+      state.pending = false; state.updated = Date.now(); paintStress(templateId);
+    }, 250);
+  }
+
+  function fillStress(box, templateId) {
+    box.replaceChildren();
+    const state = stressStates.get(templateId);
+    box.setAttribute("aria-busy", String(!state || !!state.pending));
+    box.append(el("h3", null, "Movement stress"));
+    if (state && state.error) {
+      box.append(el("p", "muted", "Stress unavailable: " + state.error));
+      const retry = el("button", "link", "Retry stress"); retry.type = "button";
+      retry.addEventListener("click", () => { state.key = null; queueStress(templateId); });
+      box.append(retry); return;
+    }
+    if (!state || state.pending || !state.result) {
+      box.append(el("p", "muted", "Updating stress…")); return;
+    }
+    const d = state.result, fmt = (v) => v.toFixed(2);
+    box.dataset.status = d.status;
+    const grid = el("div", "stress-grid");
+    for (const [label, value] of [["Session", d.session.total], ["7 days", d.rolling_7.total], ["28 days", d.rolling_28.total]]) {
+      const cell = el("div"); cell.append(el("span", null, label), el("strong", null, fmt(value))); grid.append(cell);
+    }
+    box.append(grid);
+    box.append(el("p", "muted", "Peripheral " + fmt(d.session.peripheral) + " · Central " + fmt(d.session.central)));
+    const labels = { no_sets: "No completed working sets", no_baseline: "Building history", below_usual: "Below usual", usual: "Usual range", elevated: "Elevated", much_higher: "Much higher than usual" };
+    const w = d.window;
+    box.append(el("p", null, w.median == null ? "Session window: building history" :
+      "Session window " + fmt(w.lower) + "–" + fmt(w.upper) + " · " + labels[d.status]));
+    if (w.median == null && d.status === "no_sets") box.append(el("p", "muted", labels[d.status]));
+    box.append(el("p", "muted", w.sessions + " prior sessions / " + w.days + " days" + (w.provisional ? " · Provisional" : "") +
+      (d.days_since_last == null ? "" : " · Last trained " + d.days_since_last + "d ago")));
+    const estimated = d.rolling_28.estimated_sets;
+    if (estimated || d.session.estimated_sets || w.estimated_sessions) box.append(el("p", "muted",
+      d.session.estimated_sets + " session sets estimated @5 · " + estimated + " in 28 days · " + w.estimated_sessions + " baseline sessions include estimates"));
+    if (d.session.skipped_sets || d.rolling_28.skipped_sets) box.append(el("p", "muted", "Incomplete: " + d.session.skipped_sets + " session sets and " + d.rolling_28.skipped_sets + " sets in 28 days could not be scored."));
+    const details = el("details"), summary = el("summary", null, "About these numbers");
+    details.append(summary, el("p", null, "Completed working sets only. Rolling totals include this session once, dated when it started. Blank RPEs are estimated @5. Session windows use 80–120% of the median prior session; elevated is above 120%, much higher above 150%. These describe workload, not recovery limits. Stress uses a separate default curve and does not change planned weights."));
+    box.append(details);
+  }
 
   function say(text, kind) {
     const box = $("msg"); box.replaceChildren();
@@ -951,6 +1050,9 @@
     }));
     head.append(chip, rest, more);
     left.append(renderRefBar(ex));
+    const stressBox = el("section", "stress");
+    stressBox.setAttribute("aria-label", "Stress for " + ex.title);
+    left.append(stressBox); queueStress(ex.template_id); fillStress(stressBox, ex.template_id);
     const cols = el("div", "cols");
     const heads = unit === "lb" ? ["Set", "Previous", "Lb", "Kg", "Reps", "RPE", "e1RM", ""] : ["Set", "Previous", "Kg", "Lb", "Reps", "RPE", "e1RM", ""];
     for (const t of heads) cols.append(el("span", null, t));

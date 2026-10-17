@@ -52,6 +52,7 @@ Routes used by the log, RPE and progress pages (the legacy planner has many more
 | `GET /hevy/workouts` | Recent workouts, summarised |
 | `GET /hevy/exercise-state/{template_id}` | A movement's e1RM and previous sets, from its last Hevy session |
 | `GET /training-max/{template_id}` | A movement's latest saved TS |
+| `POST /movement-stress/{template_id}` | Read-only stress preview for completed draft sets plus Hevy/local history; never saves a workout |
 | `GET/PUT /exercise-refs[/{template_id}]` | Per-movement settings |
 | `GET /rpe-table` | The RPE table in use, as `[rpe, reps, fraction]` rows |
 | `GET /rpe-observed`, `GET /rpe-observed/{template_id}` | The lifts with RPE tables, and one lift's observed cells, estimated cells, data gate and curve fit |
@@ -75,6 +76,7 @@ Routes used by the log, RPE and progress pages (the legacy planner has many more
 | `training_max.py` | The TS: building rows from a saved workout, `record`, `latest`, `history` |
 | `refs_store.py` | Per-movement settings (`exercise_refs`) |
 | `set_log.py` | The local record of every set (`logged_sets`), and the lookups the RPE page uses |
+| `stress_index.py`, `stress_service.py` | Pure, versioned stress calculation and rolling windows; bounded 60-second Hevy history cache |
 | `rpe_observed.py` | Pure: RPE tables built from logged sets, the data gate, estimated cells, curve fit |
 | `progress.py`, `strength_score.py`, `body_weight.py` | The Progress page; `LIFT_TITLES` in `progress.py` maps squat/bench/deadlift/press to Hevy exercise titles |
 | `log.html` | The log page. All its CSS and JS are inline |
@@ -133,6 +135,18 @@ How it works, in order:
 Why this shape (decisions, do not undo without asking): measuring sets against the TS's e1RM was rejected as **circular** because that e1RM comes from the table's own value at the TS's cell; the TS single must count as data; nothing the user sees may be filled in from the table; estimates need a stated amount of data first.
 
 Reference the user pointed to: the RTS article on customising an RPE chart (https://store.reactivetrainingsystems.com/blogs/advanced-concepts/customizing-your-rpe-chart): the same structure (a rep-max curve shifted by reps in reserve, 1RM = 100%), but it pins the curve with tested 1RM/4RM/8RM efforts and uses segments with different slopes (steeper near the top). Possible refinements are in the backlog.
+
+## Movement stress (2026-10-17)
+
+`/log` shows a live score for each movement from its ticked sets only. The same backend calculation scores history. Warm-ups do not count. Variants remain separate Hevy template ids; duplicate cards for one template share the aggregate movement score. A draft is a new exposure, not the source workout it was copied from.
+
+`rackbook-stress-v1` is an RTS-inspired training-dose estimate. It uses the heaviest usable set and a fixed default rep-max curve as its reference, independently of the user's loading chart, TS, TM, and LSe1RM. Ties use higher RPE, then fewer reps, so reordering does not change the score. For relative load I: CS = reps × 10^-6 × exp(14.72311 × I); PS = 0.5365534125622946 × I × sum(1.23927^(RPE − 10 − j), j=0..reps−1); total = (PS + CS)/2. Missing RPE is estimated @5, explicitly authorized by Brian for his easy/unrated sets; exact local RPE always wins. These fitted constants are a versioned starting convention, not a claim to reproduce RTS or measure physiological fatigue directly. A missing/invalid weight, reps or uncovered curve point is skipped and surfaced, not silently treated as a measured zero.
+
+The local sets of a saved workout replace its Hevy snapshot for stress, preserving unstorable RPEs and avoiding duplicate sets. Raw records are not changed. No schema migration. Remote read failures are displayed as unavailable, with retry; no fabricated zero baseline.
+
+The session window is 80–120% of the median prior session total in the trailing 56 days, excluding the draft. Elevated is above 120%; much higher above 150%. With no history there is no window; fewer than six prior sessions is provisional. Estimated baseline sessions are counted visibly. These are descriptive comparisons, not recovery/safety thresholds. Rolling 7/28-day totals are trailing elapsed durations, excluding their exact lower boundary and including the current completed draft sets once at the draft's start timestamp. Missed weeks contribute no work to totals but never create artificial zero-dose baseline sessions. Future and timezone-less historical timestamps are excluded. Days since last exposure is shown alongside.
+
+History cache: 60 seconds, up to 128 movements, invalidated for affected movements after a successful Hevy workout save. UI requests are debounced and stale responses cannot overwrite a newer draft. Stress is computed on request and never stored as a permanent historical score, allowing later model refinement to recalculate history consistently.
 
 ---
 

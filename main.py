@@ -3,6 +3,7 @@ import logging
 import os
 from collections import defaultdict
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from typing import Any, Literal
 
 import httpx
@@ -26,6 +27,8 @@ import progress
 import refs_store
 import rpe_observed
 import set_log
+import stress_index
+import stress_service
 import training_max
 from wave_math import bbb_weight, epley, joker_qualifies, joker_weight, round_weight, session_e1rm, working_weight
 from workout_payload import build_hevy_workout
@@ -234,6 +237,54 @@ class ExerciseState(BaseModel):
     e1rm_lb: float | None = None
 
 
+class StressInput(BaseModel):
+    sets: list[EntrySet] = Field(default_factory=list, max_length=500)
+    session_start: datetime | None = None
+
+
+class StressScore(BaseModel):
+    total: float
+    peripheral: float
+    central: float
+    sets: int
+    estimated_sets: int
+    skipped_sets: int
+
+
+class StressWindow(BaseModel):
+    median: float | None
+    lower: float | None
+    upper: float | None
+    elevated_upper: float | None
+    sessions: int
+    estimated_sessions: int
+    provisional: bool
+    days: int
+
+
+class MovementStress(BaseModel):
+    model_version: str
+    session: StressScore
+    window: StressWindow
+    status: Literal["no_sets", "no_baseline", "below_usual", "usual", "elevated", "much_higher"]
+    rolling_7: StressScore
+    rolling_28: StressScore
+    days_since_last: int | None
+    as_of: str
+
+
+@app.post("/movement-stress/{exercise_template_id}", response_model=MovementStress)
+def preview_movement_stress(exercise_template_id: str, data: StressInput):
+    """Read-only preview: completed draft sets plus history, never a Hevy write."""
+    if data.session_start is not None and data.session_start.tzinfo is None:
+        raise HTTPException(status_code=422, detail="Session start must include a timezone.")
+    entries = stress_service.history(exercise_template_id, lambda: _call_hevy(
+        lambda client: client.exercise_history(exercise_template_id)))
+    merged = stress_index.merge_history(entries, set_log.for_exercise(exercise_template_id))
+    return stress_index.build_summary(merged, [s.model_dump() for s in data.sets],
+        now=datetime.now(timezone.utc), session_start=data.session_start)
+
+
 @app.get("/log")
 def log_page():
     return FileResponse("log.html", headers=NO_CACHE)
@@ -364,6 +415,7 @@ def create_hevy_workout(entry: WorkoutEntry):
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     created = _call_hevy(lambda client: client.create_workout(body))
+    stress_service.invalidate(ex.exercise_template_id for ex in entry.exercises)
     training_max.record(ts_rows, entry.start_time)  # only once Hevy has the workout
     try:
         set_log.record(set_log.rows_from_entry(entry.model_dump(), created.get("id")))
