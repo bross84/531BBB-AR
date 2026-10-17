@@ -1,19 +1,24 @@
 # Rackbook
 
-A personal training planner and workout logger built around Jim Wendler's 5/3/1 BBB programme with autoregulation. Syncs completed sessions to [Hevy](https://hevyapp.com) via the Hevy API.
+A personal workout logger and strength tracker that saves to [Hevy](https://hevyapp.com). You log sets by RPE, the app plans each weight from the movement's e1RM or training max, and it builds RPE tables for your main lifts from your own sets. Not tied to any one programme.
 
-Deployed via Docker on CasaOS, used as a desktop PWA and mobile PWA.
+Deployed via Docker on CasaOS, used as a desktop and mobile PWA. It has no login, so keep it on a private network (see [Deployment](#deployment)).
 
 ---
 
 ## What it does
 
-- **Program designer** — author multi-week training blocks ahead of time (Main / BBB / Accessory tier model, 3-week wave, 8-week block minimum, 4 days per week)
-- **Autoregulated weights** — working weights computed at session time from a live e1RM, anchored by AMRAP sets and averaged Joker sets within a ±5% band
-- **BBB volume** — starting weight derived from averaged e1RM × 65/70/75% by wave week; freely overridable per session
-- **Hevy logging** — the workout log page (`/log`) saves a finished workout to Hevy via `POST /v1/workouts`; the original app (`/legacy`) saves locally only
-- **Progress** — `/progress` charts each main lift's e1RM (Hevy history + the RPE table) against your 7-day average bodyweight (Apple Health via Hevy) and a DOTS-style strength score, so a cut can be told apart from lost strength. Set `DOTS_SEX=female` for the female coefficients (default male). Which Hevy exercise each lift reads is `LIFT_TITLES` in `progress.py`
-- **Exercise cache** — Hevy exercise list pulled and cached at setup, used throughout for slot configuration and the exercise picker
+- **Workout log** (`/log`) — start empty or copy a recent Hevy workout (its warm-ups are not copied), pick exercises, tick sets off, and save the finished workout to Hevy via `POST /v1/workouts`. A draft lives in the browser until you save.
+  - Weights are entered and posted in kg, with lb beside them as a reference; a kg/lb switch flips which one you type in.
+  - Set a weight by RPE: it is filled in from the RPE table and a base number per movement, either the e1RM or the TM. LSe1RM can plan each set from the last ticked set's e1RM instead.
+  - **TS** — mark a set as a movement's TS. It pins that movement's e1RM (nothing outranks it, even a higher set), and when the workout is saved it sets the movement's TM (its e1RM × the TM %), which holds until the next saved TS.
+  - Set types: set, warm-up, TS, failure, drop set. A ticked warm-up drops out of the workout (it is not saved), and `+ Warm-up sets` builds them on request.
+  - Each set shows its e1RM; a Previous column shows last time's sets; a plate loader shows the plates for the next set; each exercise has its own rest time and a louder alarm at the end; exercises can be dragged to reorder.
+- **Own record of sets** — every set of a saved workout is also kept in the `logged_sets` table with the exact RPE. Hevy cannot store an RPE below 6 or 6.5, so this keeps what Hevy drops.
+- **RPE tables** (`/rpe-charts`) — for squat, bench and deadlift, a table of RPE by reps built from your own logged sets, next to the table in use. Each workout gets its own fitted e1RM (nothing is measured against the table's own numbers), and once a lift has enough data the cells you haven't hit are estimated from your other sets. A General tab shows the table every other movement shares. Read-only for now.
+- **Progress** (`/progress`) — each main lift's e1RM (Hevy history + the RPE table) against your 7-day average bodyweight (Apple Health via Hevy) and a DOTS-style strength score, so a cut can be told apart from lost strength. Set `DOTS_SEX=female` for the female coefficients (default male). The Hevy exercise each lift reads is `LIFT_TITLES` in `progress.py`.
+- **Recent workouts** (`/recent`) — your latest Hevy workouts.
+- **Legacy 5/3/1 planner** (`/legacy`) — the original programme designer for Wendler's 5/3/1 BBB with autoregulation (below). It is no longer the focus, and its settings page is where the Hevy API key is saved.
 
 ---
 
@@ -22,14 +27,22 @@ Deployed via Docker on CasaOS, used as a desktop PWA and mobile PWA.
 | Layer | Technology |
 |---|---|
 | Backend | Python 3.11, FastAPI |
-| Database | SQLite at `/data/rackbook.db` inside Docker |
+| Database | SQLite at `DB_PATH` (`/data/rackbook.db` inside Docker) |
 | DB access | `sqlite3` stdlib — no ORM |
-| Frontend | Vanilla JS, single-file `index.html`, no bundler |
+| Frontend | Vanilla JS, one self-contained HTML file per page, no bundler |
 | Deployment | Docker + docker-compose, CasaOS |
 
 ---
 
-## Programme model
+## RPE table
+
+`data/rpe_chart.csv` is the built-in table. If `data/rpe_chart_user.csv` exists it is used instead. Either is loaded into the `rpe_chart` table on startup and reloaded when the file changes. The file is baked into the Docker image, so changing it means redeploying.
+
+---
+
+## Legacy 5/3/1 planner
+
+Kept for reference; `/legacy` still works.
 
 ### Three tiers
 
@@ -53,21 +66,27 @@ Deployed via Docker on CasaOS, used as a desktop PWA and mobile PWA.
 | 2 | 80% | 70% |
 | 3 | 85% (+ AMRAP) | 75% |
 
-3-week wave repeats. Minimum 8-week block (approx. 3 full waves). New e1RM from each AMRAP anchors the following week's working weights automatically.
+3-week wave repeats; minimum 8-week block. New e1RM from each AMRAP anchors the following week's working weights.
 
 ---
 
 ## Database schema (overview)
 
 ```
-programs → blocks → days → exercise_slots   (template / design layer)
-programs → active_blocks                    (live training layer)
-active_blocks → session_log                 (set-by-set log)
-active_blocks → e1rm_log                    (autoregulation history)
-hevy_exercise_cache                         (pulled from Hevy at setup)
+logged_sets             every set of every saved workout, RPE as typed
+exercise_refs           per movement: basis (e1RM/TM), TM %, rounding step, bar, chains, rest time
+training_max_history    every TS saved, newest last
+rpe_chart               the RPE table in use, loaded from the CSV
+hevy_exercise_cache     exercise list pulled from Hevy
+body_measurements       daily body weight synced from Hevy
+app_settings            the Hevy API key (encrypted) and other settings
+
+programs → blocks → days → exercise_slots   (legacy 5/3/1 template layer)
+programs → active_blocks                    (legacy live layer)
+active_blocks → session_log, e1rm_log       (legacy set log and e1RM history)
 ```
 
-Full schema in [`docs/schema.md`](docs/schema.md).
+The full schema is in `database.py`.
 
 ---
 
@@ -75,21 +94,30 @@ Full schema in [`docs/schema.md`](docs/schema.md).
 
 | File | Purpose |
 |---|---|
-| `main.py` | FastAPI app, all API routes |
-| `database.py` | Schema definitions, `init_db()`, migrations |
-| `wave_math.py` | e1RM calculation, Joker band filter, BBB weight logic |
-| `hevy_client.py` | Hevy API HTTP client — exercise cache pull, recent workouts, exercise history, workout create |
-| `index.html` | Entire frontend — HTML, CSS, JS in one file |
-| `docker-compose.yml` | Deployment config |
-| `requirements.txt` | Must stay in sync with all imports in `.py` files |
+| `main.py` | FastAPI app and routes |
+| `database.py` | Schema, `init_db()`, migrations, RPE table loading |
+| `hevy_client.py` | Hevy API client — exercise list, recent workouts, exercise history, workout create |
+| `workout_payload.py` | Builds the body posted to Hevy |
+| `exercise_state.py` | A movement's e1RM and previous sets, from its last Hevy session |
+| `training_max.py` | The TS and TM |
+| `refs_store.py` | Per-movement settings |
+| `set_log.py` | The local record of sets |
+| `rpe_observed.py` | RPE tables built from your own sets |
+| `progress.py`, `strength_score.py`, `body_weight.py` | The Progress page |
+| `log.html` | Workout log (`/log`) |
+| `rpe_charts.html` | RPE tables (`/rpe-charts`) |
+| `progress.html`, `recent.html` | Progress and recent workouts |
+| `index.html`, `wave_math.py`, `program_parser.py` | The legacy 5/3/1 planner |
+| `docs/backlog.md` | What is done and what is next |
+| `docs/hevy-api.md` | Hevy API notes |
 
 ---
 
 ## Hevy integration
 
-- **Exercise list** — `GET /v1/exercise_templates` pulled at setup, stored in `hevy_exercise_cache`, refreshable via `POST /exercises/sync`
-- **Workout create** — `POST /v1/workouts`, only from the `/log` page (`POST /hevy/workouts`); Hevy has no delete endpoint, so every success is permanent
-- **API key** — stored in `app_settings` table, never hardcoded or committed
+- **Exercise list** — `GET /v1/exercise_templates`, stored in `hevy_exercise_cache`, refreshable via `POST /exercises/sync`
+- **Workout create** — `POST /v1/workouts`, only from the log page (`POST /hevy/workouts`). Hevy has no delete endpoint, so every success is permanent. An RPE Hevy can't store is left blank in what is posted; the exact value stays in `logged_sets`.
+- **API key** — stored encrypted in `app_settings`, never hardcoded or committed
 
 ---
 
@@ -98,10 +126,9 @@ Full schema in [`docs/schema.md`](docs/schema.md).
 | Constraint | Rule |
 |---|---|
 | DB access | `sqlite3` stdlib only. No SQLAlchemy, no Alembic. |
-| Frontend libraries | Chart.js only. No bundler, no build step. |
-| Frontend structure | `index.html` holds all HTML, CSS, JS. Do not split. |
+| Frontend | Vanilla JS, one self-contained HTML file per page. No bundler, no build step. |
 | DB path | Read from `os.environ` as `DB_PATH`. Never hardcode. |
-| Commits | No `git commit` or `git push`. Brian commits after review. |
+| Commits (Copilot) | Copilot does not run `git commit` or `git push`. Brian commits after review. |
 | Deletions | No permanent deletions without explicit written instruction. |
 | Column names | Always verify with `PRAGMA table_info`. Never assume. |
 
@@ -111,19 +138,21 @@ Full schema in [`docs/schema.md`](docs/schema.md).
 
 **Claude** (architect / reviewer) → **Copilot** (implementer) → **Brian** (reviewer / committer)
 
-This context file and [`docs/copilot-context.md`](docs/copilot-context.md) are read by the Copilot agent at the start of every task.
+[`docs/rackbook-context.md`](docs/rackbook-context.md) and [`docs/copilot-context.md`](docs/copilot-context.md) are read by the Copilot agent at the start of every task.
+
+Tests: `python -m unittest discover -s tests -t .`
 
 ---
 
 ## Deployment
 
 ```bash
-docker compose up -d
+docker compose up -d --build
 ```
 
-App runs on port **8126** (8125 is reserved by hevy-fatigue on the same host).
+App runs on port **8126** (8125 is reserved by hevy-fatigue on the same host). The database persists at `/data/rackbook.db` in the `rackbook-data` volume, with the encryption key for the Hevy API key at `/data/app.key`.
 
-Database persists at `/data/rackbook.db` via Docker volume.
+There is no login. To use it away from the home network, put it behind Tailscale, for example `tailscale serve --bg 8126` (run inside the Tailscale container if it runs as one), rather than exposing the port.
 
 ---
 
