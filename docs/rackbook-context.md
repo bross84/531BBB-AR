@@ -59,7 +59,7 @@ Routes used by the log, RPE and progress pages (the legacy planner has many more
 | `GET /hevy/workouts` | Recent workouts, summarised |
 | `GET /hevy/exercise-state/{template_id}` | A movement's e1RM and previous sets, from its last Hevy session |
 | `GET /training-max/{template_id}` | A movement's latest saved TS |
-| `POST /movement-stress/{template_id}` | Read-only stress preview for completed draft sets plus Hevy/local history; never saves a workout |
+| `POST /movement-stress/{template_id}` | Read-only stress for checked `sets`, optional all-entered `preview_sets`, aligned per-set scores and Hevy/local history; never saves a workout |
 | `GET /stress/movements` | Cached movements, identifying the main squat, bench and deadlift by the Progress titles |
 | `GET /movement-stress/{template_id}/history?days=56` | Saved-session stress history and current rolling totals; days=0 means all available history |
 | `GET/PUT /exercise-refs[/{template_id}]` | Per-movement settings |
@@ -147,7 +147,9 @@ Reference the user pointed to: the RTS article on customising an RPE chart (http
 
 ## Movement stress (2026-10-17)
 
-`/log` shows a compact two-line display: session stress from ticked sets, and the session window with its comparison label. Rolling totals, components, and history details remain calculated and available in the API but are hidden on the card to preserve space for sets. The same backend calculation scores history. Warm-ups do not count. Variants remain separate Hevy template ids; duplicate cards for one template share the aggregate movement score. A draft is a new exposure, not the source workout it was copied from.
+The log previews all entered working sets live, including unchecked sets, in the per-set Stress column, its total row, and the compact session value. Checked rows use actual RPE; unchecked rows use planned RPE. Each preview contribution uses the same session reference, so unrounded values sum to the preview total. Unchecked contributions are grey. Total and session-value colours compare the preview to the existing band: grey without a scored set/baseline, green within, red above, amber below. The numeric session-window line is hidden on the log; ranges remain in tooltips/accessibility labels and the dashboard. Only checked sets enter rolling totals or the finished workout payload. API `sets` remains checked-only; optional `preview_sets` supplies the draft for `preview`, `preview_set_scores`, and `preview_status`. `set_scores` aligns with checked `sets`. Warm-up/unsupported contributions are null. No stress request writes a workout. Tests: `node tests/test_log_set_stress.cjs`, plus the Python stress tests.
+
+`/log` keeps rolling totals, components, and history details calculated and available in the API but hidden on the card to preserve space for sets. The same backend calculation scores history. Warm-ups do not count. Variants remain separate Hevy template ids; duplicate cards for one template share the aggregate movement score. A draft is a new exposure, not the source workout it was copied from.
 
 `rackbook-stress-v1` is an RTS-inspired training-dose estimate. It uses the heaviest usable set and a fixed default rep-max curve as its reference, independently of the user's loading chart, TS, TM, and LSe1RM. Ties use higher RPE, then fewer reps, so reordering does not change the score. For relative load I: CS = reps × 10^-6 × exp(14.72311 × I); PS = 0.5365534125622946 × I × sum(1.23927^(RPE − 10 − j), j=0..reps−1); total = (PS + CS)/2. Missing RPE is estimated @5, explicitly authorized by Brian for his easy/unrated sets; exact local RPE always wins. These fitted constants are a versioned starting convention, not a claim to reproduce RTS or measure physiological fatigue directly. A missing/invalid weight, reps or uncovered curve point is skipped and surfaced, not silently treated as a measured zero.
 

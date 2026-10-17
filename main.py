@@ -239,6 +239,7 @@ class ExerciseState(BaseModel):
 
 class StressInput(BaseModel):
     sets: list[EntrySet] = Field(default_factory=list, max_length=500)
+    preview_sets: list[EntrySet] | None = Field(default=None, max_length=500)
     session_start: datetime | None = None
 
 
@@ -265,6 +266,10 @@ class StressWindow(BaseModel):
 class MovementStress(BaseModel):
     model_version: str
     session: StressScore
+    set_scores: list[StressScore | None] = Field(default_factory=list)
+    preview: StressScore | None = None
+    preview_set_scores: list[StressScore | None] = Field(default_factory=list)
+    preview_status: str | None = None
     window: StressWindow
     status: Literal["no_sets", "no_baseline", "below_usual", "usual", "elevated", "much_higher"]
     rolling_7: StressScore
@@ -332,7 +337,8 @@ def preview_movement_stress(exercise_template_id: str, data: StressInput):
         lambda client: client.exercise_history(exercise_template_id)))
     merged = stress_index.merge_history(entries, set_log.for_exercise(exercise_template_id))
     return stress_index.build_summary(merged, [s.model_dump() for s in data.sets],
-        now=datetime.now(timezone.utc), session_start=data.session_start)
+        now=datetime.now(timezone.utc), session_start=data.session_start,
+        preview_sets=[s.model_dump() for s in data.preview_sets] if data.preview_sets is not None else None)
 
 
 @app.get("/log")

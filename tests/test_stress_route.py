@@ -52,6 +52,22 @@ class TestStressRoute(unittest.TestCase):
         self.assertEqual(502,result.status_code)
         self.hevy.create_workout.assert_not_called()
 
+    def test_live_preview_exposes_aligned_rows_without_committing_unchecked_sets(self):
+        planned = [{'type':'normal','weight_kg':100,'reps':5,'rpe':8},
+                   {'type':'warmup','weight_kg':50,'reps':5,'rpe':5},
+                   {'type':'normal','weight_kg':90,'reps':8,'rpe':None}]
+        initial = self.client.post('/movement-stress/bench', json={'sets':[]}).json()
+        response = self.client.post('/movement-stress/bench', json={'sets':[], 'preview_sets':planned})
+        self.assertEqual(200, response.status_code, response.text)
+        data = response.json()
+        self.assertEqual(2, data['preview']['sets'])
+        self.assertIsNone(data['preview_set_scores'][1])
+        self.assertEqual(0, data['session']['sets'])
+        self.assertEqual(initial['rolling_7'], data['rolling_7'])
+        self.assertEqual(initial['rolling_28'], data['rolling_28'])
+        self.assertAlmostEqual(data['preview']['total'], sum(s['total'] for s in data['preview_set_scores'] if s))
+        self.hevy.create_workout.assert_not_called()
+
     def test_rejects_invalid_input_before_reading_hevy(self):
         for body in ({'sets':[{'weight_kg':100,'reps':5,'rpe':11}]},
                      {'session_start':'2026-10-17T10:00:00'}):

@@ -17,6 +17,35 @@ def history(days=1, id="one", **set_args):
 
 
 class TestSessionStress(unittest.TestCase):
+    def test_contributions_share_reference_and_sum_to_session(self):
+        sets = [S(231, 3, 7), S(), S(type='warmup'), S(reps=0), S(180, 8, None)]
+        total, rows = stress.score_session_sets(sets)
+        self.assertEqual(len(sets), len(rows))
+        self.assertIsNone(rows[2])
+        self.assertIsNone(rows[3])
+        self.assertEqual(1, rows[4]['estimated_sets'])
+        for key in ('total', 'central', 'peripheral'):
+            self.assertAlmostEqual(total[key], sum(row[key] for row in rows if row))
+        self.assertNotAlmostEqual(stress.session_score([sets[1]])['total'], rows[1]['total'])
+        self.assertEqual(total, stress.session_score(sets))
+
+    def test_unchecked_preview_does_not_enter_rolling_totals(self):
+        checked, planned = [S()], [S(), S(231, 3, 7)]
+        result = stress.build_summary([], checked, now=NOW, preview_sets=planned)
+        self.assertEqual(1, result['session']['sets'])
+        self.assertEqual(2, result['preview']['sets'])
+        self.assertEqual(2, len(result['preview_set_scores']))
+        self.assertEqual(result['session'], result['rolling_7'])
+        self.assertEqual(result['session'], result['rolling_28'])
+        self.assertEqual('no_baseline', result['preview_status'])
+        self.assertEqual(checked + [planned[1]], planned)
+
+    def test_preview_band_colors_use_preview_total_and_existing_thresholds(self):
+        for value, expected in [(0.79, 'below_usual'), (.8, 'usual'), (1.2, 'usual'), (1.21, 'elevated'), (1.51, 'much_higher')]:
+            self.assertEqual(expected, stress.stress_status(dict(total=value, sets=1), 1))
+        self.assertEqual('no_sets', stress.stress_status(dict(total=0, sets=0), 1))
+        self.assertEqual('no_baseline', stress.stress_status(dict(total=1, sets=1), None))
+
     def test_reproduces_controlled_examples_without_using_loading_chart(self):
         cases = [([S()], (.48,.59,.37)),
                  ([S(231,3,7),S()], (1.25,1.20,1.30)),

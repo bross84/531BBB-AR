@@ -61,7 +61,7 @@
     .card.lifted { position: relative; z-index: 5; box-shadow: 0 8px 24px rgba(0,0,0,.35); opacity: .96; }
     .chip { order: 3; min-height: 32px; padding: 3px 12px; border-radius: 16px; font-size: 13px; color: var(--muted); }
     .more { order: 2; margin-left: auto; width: 36px; min-height: 36px; padding: 0; font-size: 20px; line-height: 1; color: var(--muted); }
-    .cols, .set { display: grid; grid-template-columns: 20px 52px 1fr 32px 1fr 38px 32px 26px; gap: 2px; align-items: center; }
+    .cols, .set { display: grid; grid-template-columns: 20px 42px minmax(38px,1fr) 28px minmax(30px,1fr) 38px 30px 36px 26px; gap: 2px; align-items: center; }
     .cols { font-size: 11px; color: var(--muted); text-align: center; margin: 0 0 2px; padding: 0 4px; }   /* the same side inset as a set row (border and padding), so the labels sit over their boxes */
     .set { margin: 0 0 2px; padding: 0 4px; border-radius: 8px; }
     .set.done { background: var(--done); }
@@ -101,7 +101,7 @@
     .rpecontrol { min-width: 0; }
     .set .rpeinput, .rpearrow { display: none; }
     @media (hover: hover) and (pointer: fine) {
-      .cols, .set { grid-template-columns: 20px 52px minmax(0, 1fr) 32px minmax(0, 1fr) 60px 32px 26px; }
+      .cols, .set { grid-template-columns: 20px 42px minmax(38px,1fr) 28px minmax(30px,1fr) 60px 30px 36px 26px; }
       .rpecontrol { display: flex; align-items: center; border-radius: 8px; background: var(--chip); }
       .set.done .rpecontrol { background: transparent; }
       .set .rpeinput { display: block; min-width: 0; flex: 1; }
@@ -189,7 +189,7 @@
       .exleft { padding-top: 19px; }   /* lines the tiles up with the first set row, under the column labels */
       .tiles { flex-direction: column; }
       .tile { flex: none; }
-      .cols, .set { grid-template-columns: 36px 78px repeat(4, 1fr) 52px 40px; }
+      .cols, .set { grid-template-columns: repeat(9, minmax(0, 1fr)); }
       #addEx { display: block; max-width: 560px; margin: 12px auto 0; }
       #recent { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
       #recent .pick { margin: 0; }
@@ -321,8 +321,23 @@
     .workout-log .loader { background: var(--soft); border-color: var(--line); border-radius: 12px; padding: 10px 12px; margin-top: 12px; }
     .workout-log .loadhead button { min-height: 34px; }
     .workout-log .barfull { height: 56px; }
-    .workout-log .stress { font-size: 12px; padding-top: 10px; margin-top: 12px; }
-    .workout-log .stress-grid strong { font-size: 18px; font-weight: 700; }
+    .workout-log .stress { font-size: 13px; padding-top: 10px; margin-top: 12px; }
+    .workout-log .stress-grid strong { font-size: 13px; font-weight: 650; }
+    .workout-log .stress-window { display: none; }
+    .workout-log .stress-grid strong { color: var(--muted); }
+    .workout-log .stress[data-status="usual"] .stress-grid strong { color: var(--ok); }
+    .workout-log .stress[data-status="elevated"] .stress-grid strong, .workout-log .stress[data-status="much_higher"] .stress-grid strong { color: var(--danger); }
+    .workout-log .stress[data-status="below_usual"] .stress-grid strong { color: var(--warn); }
+    .set-stress { text-align: center; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .set.done .set-stress { color: var(--text); font-weight: 600; }
+    .stress-total { border-top: 1px solid var(--line); margin: 4px 0 10px; color: var(--muted); font-size: 13px; }
+    .stress-total .total-label { grid-column: 1 / 8; text-align: right; padding-right: 8px; }
+    .stress-total strong { text-align: center; font-size: 14px; }
+    .stress-total[data-status="usual"] strong { color: var(--ok); }
+    .stress-total[data-status="elevated"] strong, .stress-total[data-status="much_higher"] strong { color: var(--danger); }
+    .stress-total[data-status="below_usual"] strong { color: var(--warn); }
+    .workout-log .exright { min-width: 0; overflow-x: auto; }
+    @media (max-width: 599px) { .workout-log .cols, .workout-log .set { min-width: 354px; } }
     .workout-log .exleft { margin-bottom: 12px; }
     .workout-log .bar { background: var(--card); box-shadow: 0 -4px 24px rgba(23,36,58,.05); z-index: 4; }
     .workout-log .bar > div { max-width: 1072px; }
@@ -335,7 +350,7 @@
     .workout-log .padkeys button { border-radius: 10px; font-weight: 550; }
     .workout-log .padkeys button.pad-action { font-weight: 600; }
     @media (min-width: 600px) {
-      .workout-log .cols, .workout-log .set { grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 4px; }
+      .workout-log .cols, .workout-log .set { grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 4px; }
       .workout-log .set .tick { width: 32px; height: 32px; }
     }
     @media (min-width: 900px) {
@@ -548,18 +563,20 @@
     stressStates.clear();
   }
 
-  // Only completed sets count. The endpoint shares the calculation with historical scoring.
+  // All entered sets preview the session; only checked sets enter rolling totals/history.
   function stressBody(templateId) {
-    const sets = [];
+    const sets = [], preview_sets = [];
     for (const ex of draft.exercises.filter((e) => e.template_id === templateId)) {
-      for (const s of ex.sets.filter((s) => s.done)) {
-        const kg = num(s.kg), reps = Number(s.reps), logged = s.arpe || s.rpe;
-        sets.push({ type: s.type, weight_kg: Number.isFinite(kg) && kg >= 0 ? kg : null,
+      for (const s of ex.sets) {
+        const kg = num(s.kg), reps = Number(s.reps), logged = s.done ? (s.arpe || s.rpe) : s.rpe;
+        const entry = { type: s.type, weight_kg: Number.isFinite(kg) && kg >= 0 ? kg : null,
           reps: String(s.reps).trim() && Number.isInteger(reps) && reps >= 0 ? reps : null,
-          rpe: logged ? Number(logged) : null });
+          rpe: logged ? Number(logged) : null };
+        preview_sets.push(entry);
+        if (s.done) sets.push(entry);
       }
     }
-    return { sets, session_start: draft.startedAt };
+    return { sets, preview_sets, session_start: draft.startedAt };
   }
 
   function paintStress(templateId) {
@@ -568,6 +585,36 @@
       const card = cardEls.get(ex.id), box = card && card.querySelector(".stress");
       if (box) fillStress(box, templateId);
     }
+    paintSetStress(templateId);
+  }
+
+  const setStressCells = new Map();
+  function paintSetStress(templateId) {
+    const state = stressStates.get(templateId), data = state && !state.pending && !state.error ? state.result : null;
+    let index = 0;
+    for (const ex of draft.exercises.filter(e => e.template_id === templateId)) {
+      for (const s of ex.sets) {
+        const cell = setStressCells.get(s), score = data && data.preview_set_scores[index++];
+        if (!cell) continue;
+        cell.textContent = s.type === "warmup" ? "—" : data ? (score ? score.total.toFixed(2) : "—") : state && state.pending ? "…" : "—";
+        cell.title = s.type === "warmup" ? "Warm-ups do not count toward stress" : score ?
+          (s.done ? "Checked set" : "Preview; check ✓ to confirm") + (score.estimated_sets ? " · Blank RPE estimated @5" : "") : "Enter a weight and reps to preview stress";
+      }
+      const card = cardEls.get(ex.id), total = card && card.querySelector(".stress-total");
+      if (total) {
+        total.dataset.status = data ? (data.preview_status || data.status) : "no_sets";
+        total.querySelector("strong").textContent = data ? (data.preview || data.session).total.toFixed(2) : state && state.pending ? "…" : "—";
+        const comparison = data ? stressComparison(data) : "Stress preview unavailable or updating";
+        total.title = data ? comparison + " · Checked stress " + data.session.total.toFixed(2) + "; unchecked sets are not saved. Total uses unrounded scores." : comparison;
+        total.querySelector("strong").setAttribute("aria-label", "Total stress " + total.querySelector("strong").textContent + ". " + comparison);
+      }
+    }
+  }
+
+  function stressComparison(data) {
+    const labels = { usual: "Within usual range", below_usual: "Below usual range", elevated: "Above usual range", much_higher: "Above usual range", no_baseline: "Building history", no_sets: "No scored sets" };
+    const label = labels[data.preview_status || data.status];
+    return label + (data.window.median == null ? "" : " · Session window " + data.window.lower.toFixed(2) + "–" + data.window.upper.toFixed(2));
   }
 
   function queueStress(templateId) {
@@ -609,19 +656,22 @@
       box.append(el("p", "muted", "Updating stress…")); return;
     }
     const d = state.result, fmt = (v) => v.toFixed(2);
-    box.dataset.status = d.status;
+    const preview = d.preview || d.session, status = d.preview_status || d.status;
+    box.dataset.status = status;
     const grid = el("div", "stress-grid");
-    for (const [label, value] of [["Session stress", d.session.total], ["7 days", d.rolling_7.total], ["28 days", d.rolling_28.total]]) {
+    for (const [label, value] of [["Session stress", preview.total], ["7 days", d.rolling_7.total], ["28 days", d.rolling_28.total]]) {
       const cell = el("div", label === "Session stress" ? null : "stress-extra");
       cell.append(el("span", null, label), el("strong", null, fmt(value))); grid.append(cell);
     }
-    grid.title = d.session.estimated_sets + " sets estimated @5; " + d.session.skipped_sets + " sets could not be scored.";
+    grid.title = stressComparison(d) + " · Live preview; checked stress " + fmt(d.session.total) + " · " + preview.estimated_sets + " sets estimated @5";
+    grid.setAttribute("aria-label", "Session stress " + fmt(preview.total) + ". " + stressComparison(d));
     box.append(grid);
     box.append(el("p", "muted stress-extra", "Peripheral " + fmt(d.session.peripheral) + " · Central " + fmt(d.session.central)));
     const labels = { no_sets: "No completed working sets", no_baseline: "Building history", below_usual: "Below usual", usual: "Usual range", elevated: "Elevated", much_higher: "Much higher than usual" };
     const w = d.window;
     box.append(el("p", "stress-window", w.median == null ? "Session window: building history" :
-      "Session window " + fmt(w.lower) + "–" + fmt(w.upper) + (d.status === "no_sets" ? "" : " · " + labels[d.status]) + (w.provisional ? " · Provisional" : "")));
+      "Session window " + fmt(w.lower) + "–" + fmt(w.upper) + (status === "no_sets" ? "" : " · " + labels[status]) + (w.provisional ? " · Provisional" : "")));
+    if (preview.sets > d.session.sets) box.append(el("p", "muted", "Preview · " + d.session.sets + "/" + preview.sets + " sets checked"));
     if (w.median == null && d.status === "no_sets") box.append(el("p", "muted stress-extra", labels[d.status]));
     box.append(el("p", "muted stress-extra", w.sessions + " prior sessions / " + w.days + " days" + (w.provisional ? " · Provisional" : "") +
       (d.days_since_last == null ? "" : " · Last trained " + d.days_since_last + "d ago")));
@@ -630,7 +680,7 @@
       d.session.estimated_sets + " session sets estimated @5 · " + estimated + " in 28 days · " + w.estimated_sessions + " baseline sessions include estimates"));
     if (d.session.skipped_sets || d.rolling_28.skipped_sets) box.append(el("p", "muted stress-extra", "Incomplete: " + d.session.skipped_sets + " session sets and " + d.rolling_28.skipped_sets + " sets in 28 days could not be scored."));
     const details = el("details", "stress-extra"), summary = el("summary", null, "About these numbers");
-    details.append(summary, el("p", null, "Completed working sets only. Rolling totals include this session once, dated when it started. Blank RPEs are estimated @5. Session windows use 80–120% of the median prior session; elevated is above 120%, much higher above 150%. These describe workload, not recovery limits. Stress uses a separate default curve and does not change planned weights."));
+    details.append(summary, el("p", null, "Session stress previews all entered working sets. Only checked sets enter rolling totals and saved history. Rolling totals include checked sets once, dated when the session started. Blank RPEs are estimated @5. Session windows use 80–120% of the median prior session; elevated is above 120%, much higher above 150%. These describe workload, not recovery limits. Stress uses a separate default curve and does not change planned weights."));
     box.append(details);
   }
 
@@ -931,8 +981,9 @@
     show("workout");
     $("title").value = draft.title;
     const list = $("exercises"); list.replaceChildren();
-    cardEls.clear(); setE1Cells.clear();
+    cardEls.clear(); setE1Cells.clear(); setStressCells.clear();
     for (const ex of draft.exercises) { const card = renderExercise(ex); cardEls.set(ex.id, card); list.append(card); }
+    for (const id of new Set(draft.exercises.map(ex => ex.template_id))) paintStress(id);
     tickClock();
     if (stay) window.scrollTo(0, y);
   }
@@ -1272,7 +1323,7 @@
     stressBox.setAttribute("aria-label", "Stress for " + ex.title);
     left.append(stressBox); queueStress(ex.template_id); fillStress(stressBox, ex.template_id);
     const cols = el("div", "cols");
-    const heads = unit === "lb" ? ["Set", "Previous", "Lb", "Kg", "Reps", "RPE", "e1RM", ""] : ["Set", "Previous", "Kg", "Lb", "Reps", "RPE", "e1RM", ""];
+    const heads = unit === "lb" ? ["Set", "Previous", "Lb", "Kg", "Reps", "RPE", "e1RM", "Stress", ""] : ["Set", "Previous", "Kg", "Lb", "Reps", "RPE", "e1RM", "Stress", ""];
     for (const t of heads) cols.append(el("span", null, t));
     right.append(cols);
 
@@ -1322,6 +1373,8 @@
       setE1Cells.set(s, e1Cell);
       const e1 = setE1rm(s); e1Cell.textContent = e1 ? String(Math.round(e1)) : "";
       e1Cell.title = "e1RM from this set's weight, reps and RPE (lb)";
+      const stressCell = el("span", "set-stress", "—");
+      setStressCells.set(s, stressCell);
 
       const tick = el("button", "tick", "✓");
       tick.type = "button"; tick.setAttribute("aria-label", "Mark set done");
@@ -1343,7 +1396,7 @@
         }, 800);
       });
 
-      row.append(kind, prevCell, wt, refCell, reps, rpe, e1Cell, tick);
+      row.append(kind, prevCell, wt, refCell, reps, rpe, e1Cell, stressCell, tick);
       const wrap = el("div", "setwrap");
       const delBtn = el("button", "delbtn", "Delete"); delBtn.type = "button"; delBtn.setAttribute("aria-label", "Delete this set");
       wrap.append(delBtn, row);
@@ -1355,6 +1408,9 @@
       right.append(wrap);
     });
 
+    const stressTotal = el("div", "set stress-total");
+    stressTotal.append(el("span", "total-label", "Total stress"), el("strong", null, "—"), el("span"));
+    right.append(stressTotal);
     const add = el("button", "addset", "+ Add set"); add.type = "button";
     add.addEventListener("click", () => {
       const prev = ex.sets[ex.sets.length - 1];

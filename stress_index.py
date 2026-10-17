@@ -44,9 +44,15 @@ def empty_score() -> dict:
 
 
 def session_score(sets: list[dict]) -> dict:
+    return score_session_sets(sets)[0]
+
+
+def score_session_sets(sets: list[dict]) -> tuple[dict, list[dict | None]]:
+    """Aligned set contributions, all using the same movement/session reference."""
     out = empty_score()
+    contributions = [None] * len(sets)
     usable = []
-    for s in sets:
+    for index, s in enumerate(sets):
         if s.get("type", s.get("set_type")) == "warmup":
             continue
         weight, reps, rpe = s.get("weight_kg"), s.get("reps"), s.get("rpe")
@@ -57,21 +63,25 @@ def session_score(sets: list[dict]) -> dict:
                 or default_fraction(reps, rpe) is None):
             out["skipped_sets"] += 1
             continue
-        usable.append((weight, reps, rpe, s.get("rpe") is None))
+        usable.append((weight, reps, rpe, s.get("rpe") is None, index))
     if not usable:
-        return out
+        return out, contributions
     # Ties: higher RPE, then fewer reps. Deterministic under set reordering.
     anchor = max(usable, key=lambda s: (s[0], s[2], -s[1]))
     e1rm = anchor[0] / default_fraction(anchor[1], anchor[2])
-    for weight, reps, rpe, estimated in usable:
+    for weight, reps, rpe, estimated, index in usable:
         intensity = weight / e1rm
-        out["central"] += reps * 1e-6 * math.exp(CENTRAL_BETA * intensity)
-        out["peripheral"] += PERIPHERAL_SCALE * intensity * sum(
+        central = reps * 1e-6 * math.exp(CENTRAL_BETA * intensity)
+        peripheral = PERIPHERAL_SCALE * intensity * sum(
             EFFORT_MULTIPLIER ** (rpe - 10 - j) for j in range(reps))
+        contributions[index] = dict(total=(central + peripheral) / 2, central=central,
+                                   peripheral=peripheral, sets=1, estimated_sets=int(estimated), skipped_sets=0)
+        out["central"] += central
+        out["peripheral"] += peripheral
         out["sets"] += 1
         out["estimated_sets"] += int(estimated)
     out["total"] = (out["central"] + out["peripheral"]) / 2
-    return out
+    return out, contributions
 
 
 def parse_time(value) -> datetime | None:
@@ -108,7 +118,7 @@ def add_scores(scores) -> dict:
 
 
 def build_summary(entries: list[dict], current_sets: list[dict], *, now: datetime,
-                  session_start: datetime | None = None) -> dict:
+                  session_start: datetime | None = None, preview_sets: list[dict] | None = None) -> dict:
     """Rolling trailing durations include completed draft sets once, at their session start.
 
     Baseline = median session in the preceding 56 days, excluding this draft.
@@ -125,8 +135,22 @@ def build_summary(entries: list[dict], current_sets: list[dict], *, now: datetim
             continue
         groups[(entry.get("workout_id") or "", timestamp)].append(entry)
     sessions = [(key[1], session_score(sets)) for key, sets in groups.items()]
-    current = session_score(current_sets)
-    return _summary_from_sessions(sessions, current, now, current_at)
+    current, set_scores = score_session_sets(current_sets)
+    result = _summary_from_sessions(sessions, current, now, current_at)
+    result["set_scores"] = set_scores
+    preview, preview_scores = score_session_sets(preview_sets if preview_sets is not None else current_sets)
+    result.update(preview=preview, preview_set_scores=preview_scores,
+                  preview_status=stress_status(preview, result["window"]["median"]))
+    return result
+
+
+def stress_status(score: dict, typical: float | None) -> str:
+    if not score["sets"]:
+        return "no_sets"
+    if typical is None:
+        return "no_baseline"
+    ratio = score["total"] / typical
+    return "below_usual" if ratio < .8 else "usual" if ratio <= 1.2 else "elevated" if ratio <= 1.5 else "much_higher"
 
 
 def _summary_from_sessions(sessions, current, now, current_at):
@@ -138,12 +162,7 @@ def _summary_from_sessions(sessions, current, now, current_at):
               "elevated_upper": typical * 1.5 if typical is not None else None,
               "sessions": len(values), "estimated_sessions": sum(s["estimated_sets"] > 0 for s in baseline),
               "provisional": len(values) < 6, "days": BASELINE_DAYS}
-    status = "no_sets"
-    if current["sets"] and typical is None:
-        status = "no_baseline"
-    elif current["sets"]:
-        ratio = current["total"] / typical
-        status = "below_usual" if ratio < .8 else "usual" if ratio <= 1.2 else "elevated" if ratio <= 1.5 else "much_higher"
+    status = stress_status(current, typical)
     rolling = {}
     for days in (7, 28):
         scores = [s for t, s in sessions if now - timedelta(days=days) < t <= now]
@@ -152,6 +171,7 @@ def _summary_from_sessions(sessions, current, now, current_at):
         rolling[str(days)] = add_scores(scores)
     last = max((t for t, s in sessions if s["sets"]), default=None)
     return {"model_version": MODEL_VERSION, "session": current, "window": window,
+            "set_scores": [], "preview": current, "preview_set_scores": [], "preview_status": status,
             "status": status, "rolling_7": rolling["7"], "rolling_28": rolling["28"],
             "days_since_last": (now - last).days if last else None,
             "as_of": now.isoformat()}
