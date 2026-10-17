@@ -33,15 +33,15 @@
     a { color: var(--accent); }
     .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin: 0 0 12px; }
     .muted { color: var(--muted); font-size: 13px; }
-    .stress { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 13px; }
-    .stress h3 { margin: 0 0 8px; font-size: 14px; font-weight: 500; }
-    .stress-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-    .stress-grid span { display: block; color: var(--muted); font-size: 11px; }
-    .stress-grid strong { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
+    .stress { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 13px; }
+    .stress h3, .stress .stress-extra { display: none; }
+    .stress-grid { display: flex; align-items: baseline; gap: 8px; }
+    .stress-grid span { color: var(--muted); margin-right: 8px; }
+    .stress-grid strong { font-size: 16px; font-variant-numeric: tabular-nums; }
     .stress p { margin: 6px 0 0; overflow-wrap: anywhere; }
     .stress details { margin-top: 8px; color: var(--muted); font-size: 12px; }
     .stress summary { cursor: pointer; min-height: 32px; display: list-item; padding: 6px 0; }
-    .stress[data-status="elevated"] h3, .stress[data-status="much_higher"] h3 { color: #b57216; }
+    .stress[data-status="elevated"] .stress-window, .stress[data-status="much_higher"] .stress-window { color: #b57216; }
     button, select, input {
       font: inherit; color: var(--text); min-height: 44px; border-radius: 10px; border: 1px solid var(--line);
       background: var(--card);
@@ -396,23 +396,25 @@
     const d = state.result, fmt = (v) => v.toFixed(2);
     box.dataset.status = d.status;
     const grid = el("div", "stress-grid");
-    for (const [label, value] of [["Session", d.session.total], ["7 days", d.rolling_7.total], ["28 days", d.rolling_28.total]]) {
-      const cell = el("div"); cell.append(el("span", null, label), el("strong", null, fmt(value))); grid.append(cell);
+    for (const [label, value] of [["Session stress", d.session.total], ["7 days", d.rolling_7.total], ["28 days", d.rolling_28.total]]) {
+      const cell = el("div", label === "Session stress" ? null : "stress-extra");
+      cell.append(el("span", null, label), el("strong", null, fmt(value))); grid.append(cell);
     }
+    grid.title = d.session.estimated_sets + " sets estimated @5; " + d.session.skipped_sets + " sets could not be scored.";
     box.append(grid);
-    box.append(el("p", "muted", "Peripheral " + fmt(d.session.peripheral) + " · Central " + fmt(d.session.central)));
+    box.append(el("p", "muted stress-extra", "Peripheral " + fmt(d.session.peripheral) + " · Central " + fmt(d.session.central)));
     const labels = { no_sets: "No completed working sets", no_baseline: "Building history", below_usual: "Below usual", usual: "Usual range", elevated: "Elevated", much_higher: "Much higher than usual" };
     const w = d.window;
-    box.append(el("p", null, w.median == null ? "Session window: building history" :
-      "Session window " + fmt(w.lower) + "–" + fmt(w.upper) + " · " + labels[d.status]));
-    if (w.median == null && d.status === "no_sets") box.append(el("p", "muted", labels[d.status]));
-    box.append(el("p", "muted", w.sessions + " prior sessions / " + w.days + " days" + (w.provisional ? " · Provisional" : "") +
+    box.append(el("p", "stress-window", w.median == null ? "Session window: building history" :
+      "Session window " + fmt(w.lower) + "–" + fmt(w.upper) + (d.status === "no_sets" ? "" : " · " + labels[d.status]) + (w.provisional ? " · Provisional" : "")));
+    if (w.median == null && d.status === "no_sets") box.append(el("p", "muted stress-extra", labels[d.status]));
+    box.append(el("p", "muted stress-extra", w.sessions + " prior sessions / " + w.days + " days" + (w.provisional ? " · Provisional" : "") +
       (d.days_since_last == null ? "" : " · Last trained " + d.days_since_last + "d ago")));
     const estimated = d.rolling_28.estimated_sets;
-    if (estimated || d.session.estimated_sets || w.estimated_sessions) box.append(el("p", "muted",
+    if (estimated || d.session.estimated_sets || w.estimated_sessions) box.append(el("p", "muted stress-extra",
       d.session.estimated_sets + " session sets estimated @5 · " + estimated + " in 28 days · " + w.estimated_sessions + " baseline sessions include estimates"));
-    if (d.session.skipped_sets || d.rolling_28.skipped_sets) box.append(el("p", "muted", "Incomplete: " + d.session.skipped_sets + " session sets and " + d.rolling_28.skipped_sets + " sets in 28 days could not be scored."));
-    const details = el("details"), summary = el("summary", null, "About these numbers");
+    if (d.session.skipped_sets || d.rolling_28.skipped_sets) box.append(el("p", "muted stress-extra", "Incomplete: " + d.session.skipped_sets + " session sets and " + d.rolling_28.skipped_sets + " sets in 28 days could not be scored."));
+    const details = el("details", "stress-extra"), summary = el("summary", null, "About these numbers");
     details.append(summary, el("p", null, "Completed working sets only. Rolling totals include this session once, dated when it started. Blank RPEs are estimated @5. Session windows use 80–120% of the median prior session; elevated is above 120%, much higher above 150%. These describe workload, not recovery limits. Stress uses a separate default curve and does not change planned weights."));
     box.append(details);
   }
