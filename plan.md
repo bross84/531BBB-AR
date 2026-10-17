@@ -1,5 +1,7 @@
 # 531 BBB-AR — Plan
 
+**Historical log of the original 5/3/1 build (June to early October 2026).** It is no longer kept up to date. For what the app is now and what is next, read `docs/rackbook-context.md` and `docs/backlog.md`.
+
 Newest entries at the top. Each completed task is logged here with workflow, files changed, and gate results before the next task begins.
 
 ---

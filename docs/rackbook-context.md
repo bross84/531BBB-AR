@@ -1,7 +1,21 @@
 # Rackbook — Project Context
 
-Source of truth for architecture, schema, wave math rules, and constraints.  
-Read this file at the start of every task. Do not proceed if it is missing.
+Source of truth for architecture, schema, domain terms, decisions and constraints.
+Read this file at the start of every task. Do not proceed if it is missing. What is done and what is next lives in [`backlog.md`](backlog.md); `plan.md` is only a history log of the original 5/3/1 build.
+
+Last brought up to date: 2026-10-16.
+
+---
+
+## What this is now
+
+Rackbook is a personal workout logger and strength tracker that saves to [Hevy](https://hevyapp.com). It started as a 5/3/1 BBB planner and has moved away from that: the main thing now is the **log page** (`/log`), which plans each set's weight from an RPE table and a per-movement base number, saves the finished workout to Hevy, and keeps its own record of every set. On top of that it builds **RPE tables for squat, bench and deadlift from the user's own sets** (`/rpe-charts`). The original 5/3/1 program designer still works at `/legacy` but is no longer developed.
+
+One user (Brian), one Hevy account. The app has no login; it is meant to sit on a private network (Docker on a CasaOS homelab, reached over Tailscale with `tailscale serve`). It can write permanent workouts to the user's Hevy account, so treat every real save as irreversible.
+
+### How it is used
+
+Brian lifts 3 days a week and logs on his phone in the gym. He works up to a single (a 1 @7 or 1 @8) on his primary squat and bench each session, marks it as the **TS**, and does back-off sets of 5 at lower RPEs. Day 1: squat, bench, Pendlay rows (plus a deadlift single). Day 2: a supplementary squat (a different Hevy exercise), press, stiff-legged deadlifts. Day 3: deadlift, bench, squat. The goal behind the RPE tables is a personal RPE chart per main lift that fills in over months from real sets.
 
 ---
 
@@ -10,14 +24,41 @@ Read this file at the start of every task. Do not proceed if it is missing.
 | Layer | Technology |
 |---|---|
 | Backend | Python 3.11, FastAPI |
-| Database | SQLite at `/data/rackbook.db` inside Docker — `sqlite3` stdlib, no ORM |
-| Frontend | Vanilla JS, single `index.html` — all HTML, CSS, JS in one file, no bundler |
-| HTTP client | `httpx` (async) for Hevy API calls |
-| Deployment | Docker + docker-compose on CasaOS homelab |
-| Port | 8126 (8125 reserved by sibling service `hevy-fatigue`) |
-| PWA | Used as desktop PWA and mobile PWA |
+| Database | SQLite at `DB_PATH` (`/data/rackbook.db` inside Docker) — `sqlite3` stdlib, no ORM |
+| Frontend | Vanilla JS, one self-contained HTML file per page, no bundler, no build step, no libraries |
+| HTTP client | `httpx` for Hevy API calls |
+| Deployment | Docker + docker-compose on CasaOS homelab, port 8126 (8125 is reserved by the sibling service `hevy-fatigue`) |
+| PWA | Desktop and mobile PWA (`static/manifest.webmanifest`, `static/sw.js`) |
+| Tests | `python -m unittest discover -s tests -t .` (pytest is not installed). Also run on GitHub for every push |
 
-**Allowed frontend libraries:** Chart.js only. No frameworks, no build step.
+---
+
+## Pages and routes
+
+| Page | File | What it is |
+|---|---|---|
+| `/log` | `log.html` | The workout log. The main page. |
+| `/recent` | `recent.html` | Latest Hevy workouts |
+| `/progress` | `progress.html` | Each main lift's e1RM, 7-day bodyweight and DOTS-style score over time |
+| `/rpe-charts` | `rpe_charts.html` | RPE tables built from the user's own sets (Squat, Bench, Deadlift, General tabs) |
+| `/legacy` | `index.html` | The original 5/3/1 planner; its `#settings` is where the Hevy API key is saved |
+| `/health` | | `{"status":"ok"}` |
+
+Routes used by the log, RPE and progress pages (the legacy planner has many more, see `main.py`):
+
+| Route | Purpose |
+|---|---|
+| `POST /hevy/workouts` | Save a finished workout to Hevy, then record its TS rows and every set locally |
+| `GET /hevy/workouts` | Recent workouts, summarised |
+| `GET /hevy/exercise-state/{template_id}` | A movement's e1RM and previous sets, from its last Hevy session |
+| `GET /training-max/{template_id}` | A movement's latest saved TS |
+| `GET/PUT /exercise-refs[/{template_id}]` | Per-movement settings |
+| `GET /rpe-table` | The RPE table in use, as `[rpe, reps, fraction]` rows |
+| `GET /rpe-observed`, `GET /rpe-observed/{template_id}` | The lifts with RPE tables, and one lift's observed cells, estimated cells, data gate and curve fit |
+| `GET /progress/data?lift=` | A main lift's series for the Progress page |
+| `GET /exercises`, `POST /exercises/sync` | The cached Hevy exercise list |
+| `GET /settings`, `POST /settings/api-key` | Whether a Hevy key is set (never returns it), and saving it (204, empty body) |
+| `POST /body-weight/sync`, `GET /body-weight` | Daily body weight from Hevy |
 
 ---
 
@@ -25,226 +66,111 @@ Read this file at the start of every task. Do not proceed if it is missing.
 
 | File | Purpose |
 |---|---|
-| `main.py` | FastAPI app entry point, all API route definitions |
-| `database.py` | `init_db()`, schema DDL, `get_db()` helper |
-| `wave_math.py` | Pure functions — e1RM, Joker filter, weight rounding, BBB weight |
-| `hevy_client.py` | Hevy API HTTP client — exercise cache sync, recent workouts, exercise history, workout create |
-| `index.html` | Entire frontend |
-| `docker-compose.yml` | Deployment |
+| `main.py` | FastAPI app, routes and request/response models. Handlers stay thin; logic goes in the modules below |
+| `database.py` | `init_db()`, schema DDL and `ALTER TABLE` migrations, `get_db()`, RPE table loading (`get_rpe_percentage`) |
+| `hevy_client.py` | Hevy API client and encrypted API key storage |
+| `workout_payload.py` | Pure: builds the body posted to Hevy, trimming an RPE Hevy can't store |
+| `workout_view.py` | Pure: summarises Hevy workouts for `/recent` |
+| `exercise_state.py` | Pure: a movement's e1RM and previous sets from Hevy history; `e1rm_lb` |
+| `training_max.py` | The TS: building rows from a saved workout, `record`, `latest`, `history` |
+| `refs_store.py` | Per-movement settings (`exercise_refs`) |
+| `set_log.py` | The local record of every set (`logged_sets`), and the lookups the RPE page uses |
+| `rpe_observed.py` | Pure: RPE tables built from logged sets, the data gate, estimated cells, curve fit |
+| `progress.py`, `strength_score.py`, `body_weight.py` | The Progress page; `LIFT_TITLES` in `progress.py` maps squat/bench/deadlift/press to Hevy exercise titles |
+| `log.html` | The log page. All its CSS and JS are inline |
+| `rpe_charts.html`, `progress.html`, `recent.html` | The other pages |
+| `data/rpe_chart.csv`, `data/rpe_chart_user.csv` | The RPE table. The user's file wins when present; the table is loaded into `rpe_chart` at startup and reloaded when the file changes. Baked into the Docker image, so changing it means redeploying |
+| `wave_math.py`, `program_parser.py`, `index.html` | The legacy 5/3/1 planner |
+| `docker-compose.yml`, `Dockerfile` | Deployment |
 | `requirements.txt` | Must stay in sync with all imports in `.py` files |
 
 ---
 
-## Program model
+## Domain terms (as the app uses them)
 
-Programs are program-agnostic. Tiers, wave structure, sets, reps, and percentages are all user-defined per program. There are no hardcoded tier names.
-
-### Tiers
-
-Each program defines its own tiers. A tier has a name (user-defined), a behaviour, and a display order. Four behaviours are supported:
-
-| Behaviour | Description |
-|---|---|
-| `percentage` | Weight = training max or e1RM × percentage from `wave_params` |
-| `fixed` | User sets the weight — app tracks it but does not compute it |
-| `progression` | Fixed weight that auto-increments by a configured amount when rep target is hit |
-| `free` | No prescribed weight or sets — free log only |
-
-### Wave structure
-
-Wave structure is defined per exercise slot via `wave_params` JSON. There is no assumed number of microcycles or days. Microcycles are numbered and user-labeled — they are not calendar weeks.
-
-### RPE
-
-All programs derive percentages from RPE. Each exercise slot stores a `target_rpe`. Session log stores both `target_rpe` and `actual_rpe` so drift between intended and actual can be tracked over time. The RPE → percentage lookup table lives in `app_settings`.
-
-### Microcycles
-
-Training cycles are called microcycles, not weeks. They have no fixed length in days. The label is freeform — "Micro 1", "Wave 1", etc.
+- **e1RM** — estimated one-rep max, in lb inside the code (`LB_PER_KG = 2.20462`). For a set: weight ÷ the RPE table's fraction for its reps and RPE.
+- **RPE table** — `(rpe, reps) → fraction of e1RM`. The user's table is built entirely on one fact: it depends only on **k = reps + (10 − RPE)**, the reps to failure the set is equivalent to. A 5 @7 and an 8 @10 are the same cell value. Verified on all comparable cells of `rpe_chart_user.csv`.
+- **TS** — a set the user marks (tap its set number: set → warm-up → TS → failure → drop set). It pins the movement's e1RM and, **when the workout is saved**, sets the movement's TM. Every TS is kept in `training_max_history`. Needs a weight, reps and an RPE.
+- **TM** — training max = latest saved TS's e1RM × `tm_pct` (default 95%, per movement). Without a saved TS it falls back to the last session's best set × `tm_pct`.
+- **Basis** — per movement, which number plans weights: `e1rm` or `tm`. Set by tapping the e1RM or TM tile.
+- **e1RM tile logic** — if the movement has a TS (marked and ticked in this workout, else the latest saved), that is the e1RM and **nothing outranks it**, however high another set's e1RM is. With no TS it is the best set today (highest e1RM), until a set is done the one from the last session.
+- **LSe1RM** — per movement (default on): after a set is ticked, the next sets plan from that set's e1RM instead of the base.
+- **Planned weight** — base × RPE table fraction, rounded to the movement's step (`step_kg` 2.5 / `step_lb` 5 by default, finer for micro-loaded lifts). Weights are stored and posted in **kg**; lb is a reference, and a kg/lb switch chooses which one is typed.
+- **Warm-ups** — never copied when starting from a past workout; a ticked warm-up drops out of the workout after ~0.8 s and is **not** saved to Hevy or the local record (deliberate: the user sees no value in warm-up history). `+ Warm-up sets` builds them on request.
+- **Rest timer** — starts when a working set is ticked; each movement has its own time (`exercise_refs.rest_sec`, NULL = use the bottom-bar default); the alarm is deliberately loud.
 
 ---
 
-## Wave math rules (`wave_math.py`)
+## Hevy integration and its limits
 
-All functions in `wave_math.py` are **pure**: no DB access, no HTTP calls, no side effects. This is a hard invariant.
+- **Exercise list** — `GET /v1/exercise_templates`, cached in `hevy_exercise_cache`, refreshed via `POST /exercises/sync`.
+- **Workout create** — only the `/log` page writes to Hevy: `POST /hevy/workouts` builds the body with `build_hevy_workout` and sends it with `HevyClient.create_workout`. Hevy has **no delete endpoint**, so every success is a permanent workout. Test with the Hevy client mocked, never against the real account.
+- **Hevy cannot store an RPE below 6 or 6.5.** `build_hevy_workout` leaves such an RPE blank in what it posts. The exact RPE is kept in `logged_sets`. Anything that reads history back **from Hevy** (the Previous column, the last-session e1RM, the Progress page) therefore never sees those RPEs. Overlaying the local record onto Hevy history is a known gap (see the backlog).
+- **API key** — stored encrypted in `app_settings` (Fernet key at `/data/app.key`), never hardcoded or committed; `GET /settings` never returns it.
+- Errors from Hevy and key problems come back as HTTP errors through `_call_hevy` in `main.py`.
 
-### Constants
+---
 
-```python
-JOKER_BAND = 0.05   # ±5% band for Joker qualification
-ROUND_TO_KG = 2.5   # all displayed/stored weights rounded to nearest 2.5 kg
-```
+## The local record of sets
 
-### Epley formula
+`logged_sets` (written by `set_log.record` after Hevy accepts the workout) has one row per saved set: workout start/end, Hevy workout id, exercise template id and title, set number within the exercise, type, `weight_kg`, `reps`, exact `rpe`, `is_ts`. A failure to record is logged but does not fail the save (a retry would post the workout to Hevy twice). Rows exist only from the day this was deployed; Hevy history is not backfilled.
 
-```python
-def epley(weight_kg: float, reps: int) -> float:
-    if reps == 1:
-        return weight_kg
-    return weight_kg * (1 + reps / 30)
-```
+---
 
-Used to compute e1RM from any (weight, reps) pair.
+## RPE tables from the user's own sets (`rpe_observed.py`, `/rpe-charts`)
 
-### Joker qualification
+The aim: a personal RPE table for squat, bench and deadlift (and the general table for everything else) built from real data and filled in over months, never from guesses and never from the table in use. The page shows the table in use only for comparison (and, if the user switches it on, in empty cells).
 
-```python
-def joker_qualifies(joker_e1rm: float, amrap_e1rm: float) -> bool:
-    return abs(joker_e1rm - amrap_e1rm) / amrap_e1rm <= JOKER_BAND
-```
+How it works, in order:
 
-Joker sets with **no RPE logged** are excluded before this function is called — the caller is responsible for filtering them out.
+1. Sets used: not warm-ups or drop sets, with a weight, reps and an RPE. Every set counts, **the TS included**; no set is a reference.
+2. Each workout gets its own e1RM. A straight line in k, `f(k) = 1 − slope·(k − 1)` (a true RPE 10 single = 100%), is fitted to all sets; then the curve is redrawn through the sets themselves (average share per k, kept non-increasing) and the e1RMs refitted, a few rounds. The overall scale is fixed only by the straight-line fit and that 100% pin.
+3. A cell = the average share (set weight ÷ its workout's fitted e1RM) of the sets at that exact RPE and reps, with the count `n` and the gap to the table in use.
+4. **Data gate** per lift (constants in `rpe_observed.py`): `MIN_SETS = 15`, `MIN_WORKOUTS = 3`, `MIN_K_SPAN = 4.0` reps of effort between the hardest and easiest sets. Until it is passed no cell is estimated and the page shows progress toward it.
+5. Once passed, cells with no sets are **estimated** by interpolating the curve (shown as `est`), never from the table in use, and left empty past the hardest and easiest effort logged.
+6. A "fitted curve" card shows the straight-line slope against the table's, and each workout's fitted e1RM against the e1RM the TS gave from the table.
 
-### Session e1RM
+Why this shape (decisions, do not undo without asking): measuring sets against the TS's e1RM was rejected as **circular** because that e1RM comes from the table's own value at the TS's cell; the TS single must count as data; nothing the user sees may be filled in from the table; estimates need a stated amount of data first.
 
-```python
-def session_e1rm(amrap_e1rm: float, joker_sets: list[tuple[float, float]]) -> float:
-```
-
-- `joker_sets` — list of `(weight_kg, reps)` for RPE-logged Jokers only.
-- Jokers outside ±5% band are silently excluded.
-- Result is the mean of the AMRAP e1RM and all qualifying Joker e1RMs.
-- This value is written to `e1rm_log` with `source = 'amrap'` (AMRAP only) or `source = 'joker_avg'` (averaged with Jokers).
-
-### Working weight (Main sets)
-
-```python
-def working_weight(training_max_kg: float, week_number: int, wave_params: dict) -> float:
-    pct = wave_params["percentages"][week_number - 1]
-    return _round_weight(training_max_kg * pct)
-```
-
-`wave_params["percentages"]` is a 3-element list indexed by `week_number - 1`.
-
-### BBB weight
-
-```python
-def bbb_weight(e1rm_kg: float, week_number: int, wave_params: dict) -> float:
-    pct = wave_params["bbb_percentages"][week_number - 1]
-    return _round_weight(e1rm_kg * pct)
-```
-
-`wave_params["bbb_percentages"]` is a 3-element list: `[0.65, 0.70, 0.75]` by default.
-
-### Rounding
-
-All weights — planned and actual — must be rounded to the nearest 2.5 kg before display or storage. Use `_round_weight()`. Never store or display unrounded floats.
+Reference the user pointed to: the RTS article on customising an RPE chart (https://store.reactivetrainingsystems.com/blogs/advanced-concepts/customizing-your-rpe-chart): the same structure (a rep-max curve shifted by reps in reserve, 1RM = 100%), but it pins the curve with tested 1RM/4RM/8RM efforts and uses segments with different slopes (steeper near the top). Possible refinements are in the backlog.
 
 ---
 
 ## Database schema
 
-Foreign keys are enforced (`PRAGMA foreign_keys = ON` in `get_db()`).
+Foreign keys are enforced (`PRAGMA foreign_keys = ON` in `get_db()`). Always verify columns with `PRAGMA table_info`; `database.py` is the full DDL, and columns added later are `ALTER TABLE`s in `init_db()`.
 
-### Design layer (program authoring)
-
-```
-programs
-  id INTEGER PK
-  name TEXT NOT NULL
-  total_weeks INTEGER NOT NULL
-  notes TEXT
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-
-tiers
-  id INTEGER PK
-  program_id INTEGER FK → programs.id
-  name TEXT NOT NULL
-  behaviour TEXT NOT NULL  CHECK IN ('percentage','fixed','progression','free')
-  display_order INTEGER NOT NULL DEFAULT 0
-
-blocks
-  id INTEGER PK
-  program_id INTEGER FK → programs.id
-  cycle_number INTEGER NOT NULL
-  label TEXT
-
-days
-  id INTEGER PK
-  block_id INTEGER FK → blocks.id
-  day_number INTEGER NOT NULL
-  label TEXT
-
-exercise_slots
-  id INTEGER PK
-  day_id INTEGER FK → days.id
-  tier_id INTEGER FK → tiers.id
-  hevy_exercise_id TEXT NOT NULL
-  hevy_exercise_name TEXT NOT NULL
-  slot_order INTEGER NOT NULL DEFAULT 0
-  wave_params TEXT  -- JSON: {"percentages": [...], "bbb_percentages": [...]}
-  target_rpe REAL
-```
-
-### Live training layer
+### Tables the current app uses
 
 ```
-active_blocks
-  id INTEGER PK
-  program_id INTEGER FK → programs.id
-  started_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  current_cycle INTEGER NOT NULL DEFAULT 1
-  current_day INTEGER NOT NULL DEFAULT 1
-  status TEXT NOT NULL DEFAULT 'active'  CHECK IN ('active','completed','abandoned')
-
-session_log
-  id INTEGER PK
-  active_block_id INTEGER FK → active_blocks.id
-  exercise_slot_id INTEGER FK → exercise_slots.id
-  week_number INTEGER NOT NULL
-  day_number INTEGER NOT NULL
-  set_number INTEGER NOT NULL
-  set_type TEXT NOT NULL
-  planned_weight_kg REAL   -- rounded to 2.5 kg
-  actual_weight_kg REAL    -- rounded to 2.5 kg
-  reps INTEGER
-  target_rpe REAL
-  actual_rpe REAL
-  hevy_workout_id TEXT
-  logged_at DATETIME DEFAULT CURRENT_TIMESTAMP
-
-e1rm_log
-  id INTEGER PK
-  active_block_id INTEGER FK → active_blocks.id
-  exercise_slot_id INTEGER FK → exercise_slots.id
-  e1rm_kg REAL NOT NULL
-  source TEXT NOT NULL  CHECK IN ('amrap','joker_avg','manual')
-  logged_at DATETIME DEFAULT CURRENT_TIMESTAMP
+logged_sets            id, hevy_workout_id, workout_title, workout_start, workout_end,
+                       exercise_template_id, exercise_title, set_number, set_type,
+                       weight_kg, reps, rpe, is_ts, recorded_at
+exercise_refs          exercise_template_id PK, basis ('e1rm'|'tm'), ls, tm_pct, step_kg, step_lb,
+                       bar_kg, chain_kg, rest_sec (NULL = default); old e1rm_lb/tm_lb/auto unused
+training_max_history   id, exercise_template_id, e1rm_lb, weight_lb, reps, rpe, set_at, recorded_at
+rpe_chart              rpe, reps, percentage (PK rpe+reps), loaded from the CSV
+hevy_exercise_cache    id (Hevy template id), title, primary_muscle, cached_at
+body_measurements      date PK, weight_kg, lean_mass_kg, fat_percent, synced_at
+app_settings           key PK, value (Hevy API key encrypted, RPE table source hash, ...)
 ```
 
-### Support tables
+### Legacy 5/3/1 planner tables
 
 ```
-hevy_exercise_cache
-  id TEXT PK              -- Hevy exerciseTemplateId
-  title TEXT NOT NULL
-  primary_muscle TEXT
-  cached_at DATETIME DEFAULT CURRENT_TIMESTAMP
-
-app_settings
-  key TEXT PK
-  value TEXT NOT NULL     -- Hevy API key stored here, never hardcoded
+programs → tiers, blocks (cycles) → days → exercise_slots   (template layer)
+programs → active_blocks                                     (live layer)
+active_blocks → session_log (set-by-set), e1rm_log           (history)
+microcycles                                                  (older cycle table)
 ```
 
 ---
 
-## Hevy integration
+## Legacy 5/3/1 planner (`/legacy`, not developed further)
 
-### Exercise cache
+Programs are program-agnostic: tiers (behaviours `percentage`, `fixed`, `progression`, `free`), wave structure per exercise slot (`wave_params` JSON), microcycles numbered and user-labelled. All percentages derive from RPE (`target_rpe` and `actual_rpe` per set). `test_session_route.py` pins its current session and e1RM behaviour; `expectedFailure` tests there mark known bugs.
 
-- Pulled from `GET /v1/exercise_templates` at setup.
-- Stored in `hevy_exercise_cache`. Refreshable via `POST /exercises/sync`.
-- `hevy_exercise_cache.id` is the `exerciseTemplateId` used in workout payloads.
-
-### Workout create
-
-- Only the `/log` page writes to Hevy: `POST /hevy/workouts` builds the body with `build_hevy_workout` and sends it with `HevyClient.create_workout` (`POST /v1/workouts`).
-- Hevy has no delete endpoint, so every success creates a permanent workout. Test with the request mocked.
-- The original app (`/legacy`) saves sessions locally only and no longer posts to Hevy. `session_log.hevy_workout_id` is no longer written.
-
-### API key
-
-Stored in `app_settings` table under a known key. Never hardcoded, never committed.
+`wave_math.py` is pure (no DB, no HTTP): Epley e1RM (`weight × (1 + reps/30)`, a single is the weight), Joker qualification within `JOKER_BAND = 0.05` of the AMRAP e1RM, `session_e1rm` (mean of the AMRAP e1RM and qualifying Joker e1RMs), `working_weight` and `bbb_weight` (3-element percentage lists indexed by week − 1), rounding to 2.5 kg. Jokers with no RPE are excluded before the filter.
 
 ---
 
@@ -255,66 +181,44 @@ Stored in `app_settings` table under a known key. Never hardcoded, never committ
 | DB path | Read from `os.environ["DB_PATH"]`. Never hardcode. |
 | DB library | `sqlite3` stdlib only. No SQLAlchemy, no Alembic. |
 | SQL safety | Parameterised queries only. No f-string SQL. |
-| Weights | Always rounded to nearest 2.5 kg before display or storage. |
-| `wave_math.py` | Pure functions only — no DB, no HTTP, no side effects. |
-| Frontend libraries | Chart.js only. No bundler, no build step. |
-| Frontend structure | All HTML/CSS/JS stays in `index.html`. Do not split. |
-| Hevy writes | Only via `POST /hevy/workouts`; errors come back as HTTP errors (`_call_hevy` in `main.py`). |
-| Schema changes | Always verify columns with `PRAGMA table_info`. Never assume. |
-| Deletions | No permanent deletions without explicit written instruction. |
-| Commits | Brian commits after review. Implementer does not `git commit` or `git push`. |
+| Frontend | Vanilla JS, one self-contained HTML file per page, no bundler, no build step. Do not split a page's CSS/JS out. |
+| Pure modules | `wave_math.py`, `workout_payload.py`, `workout_view.py`, `exercise_state.py`, `rpe_observed.py`: no DB access, no HTTP, no side effects. |
+| Weights | Stored and posted in kg. Planned weights round to the movement's step (default 2.5 kg / 5 lb), never unrounded floats. |
+| Hevy writes | Only via `POST /hevy/workouts`. Never post to the real account from tests or experiments. |
+| Schema changes | New tables in the `CREATE TABLE IF NOT EXISTS` block, new columns as `ALTER TABLE` in `init_db()`; verify with `PRAGMA table_info`. |
+| Table values | Nothing in the RPE tables view may be filled in from the table in use; estimates come from the user's sets only. |
+| Deletions | No permanent deletions without explicit written instruction. Hide or retire things rather than delete (the user's preference). |
+| Commits (Copilot) | The Copilot implementer does not `git commit` or `git push`. Brian commits after review. (The architect, i.e. Claude, may commit and push finished work; see `CLAUDE.md`.) |
 
 ---
 
-## Architecture conventions
+## Working conventions
 
-- FastAPI route handlers stay thin — business logic goes in service modules.
-- Pydantic models for all request/response shapes.
-- Environment config via `.env` / `python-dotenv`.
-- Docker-aware: the app runs in a container; `/data/` is a volume mount.
+- FastAPI route handlers stay thin — business logic goes in service modules; Pydantic models for all request/response shapes; config via `.env` / `python-dotenv`.
+- Conventional commits (`feat:`, `fix:`, `refactor:`, `test:`, `chore:`, `docs:`), one logical change per commit. Push only when the tests pass.
+- **One feature at a time**: build it small, check it live (the user uses it on a phone), then the next. Do not change behaviour the user did not ask about; when a design has a real tradeoff, ask one question.
+- Add tests for non-trivial logic. The suite takes about 12 s; run all of it before pushing.
+- Windows checkout: files use CRLF in the working tree (git warns about LF→CRLF; harmless). Edit with tools that preserve line endings.
+- Dev servers (`.claude/launch.json`): `rackbook-dev` on port 8127 uses `.env` (`DB_PATH=./rackbook.db`, the local database). The `rackbook` config on 8126 fails if the local Docker container is already using that port. Test data written to the local database must be removed afterwards (use template ids starting `ZZ-`).
+- `index.html`'s `fetchJson` and the log page's `api()` read JSON bodies; `POST /settings/api-key` answers 204 with an empty body, which `fetchJson` must tolerate.
+
+---
+
+## Deployment
+
+```bash
+git pull && docker compose up -d --build     # in the repo folder on the server
+curl -s localhost:8126/health                # {"status":"ok"}
+```
+
+The database lives in the named volume `rackbook-data` at `/data/rackbook.db`, with the Hevy key's encryption key at `/data/app.key`; both survive rebuilds. Only `docker compose down -v` wipes them. Logs: `docker logs rackbook -f`.
+
+For HTTPS and phone access, `tailscale serve --bg 8126` (inside the Tailscale container if it runs as one, which is host-networked here, so `http://localhost:8126` works). The Hevy API key is entered once at `/legacy#settings`.
+
+Local Docker on Windows (Docker Desktop) also works with the same compose file; an old container named `531bbb` from before the rename may be holding port 8126 on the dev PC.
 
 ---
 
 ## Development workflow
 
-**Claude** (architect / spec writer) → **Copilot** (implementer, reads `docs/copilot-context.md`) → **Brian** (reviewer / committer)
-
-Implementer agent instructions live in [`docs/copilot-context.md`](copilot-context.md).
-
----
-
-## Local Docker (Windows)
-
-Tested on Windows with Docker Desktop. Uses a named volume — no bind-mount path issues.
-
-**Build and run:**
-```
-docker compose up --build -d
-```
-
-**Stop:**
-```
-docker compose stop
-```
-
-**Start after stop:**
-```
-docker compose start
-```
-
-**Tear down (removes containers and volume — destroys DB):**
-```
-docker compose down -v
-```
-
-**View logs:**
-```
-docker logs rackbook -f
-```
-
-**Health check:**
-```
-curl http://localhost:8126/health
-```
-
-The SQLite DB is stored in the named volume `rackbook_rackbook-data` at `/data/rackbook.db` inside the container. The Fernet key is at `/data/app.key`. Both persist across `stop`/`start` cycles. Only `down -v` wipes them.
+**Claude** (architect, writes and commits finished work) → **Copilot** (implementer for routine tasks, reads [`copilot-context.md`](copilot-context.md)) → **Brian** (reviewer). Other AI tools: read this file, `CLAUDE.md` / `AGENTS.md`, and `backlog.md`.

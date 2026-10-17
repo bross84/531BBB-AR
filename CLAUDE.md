@@ -1,12 +1,22 @@
 # CLAUDE.md — Rackbook
 
 ## Project Overview
-Python/FastAPI training planner and workout logger for Wendler 5/3/1 BBB with autoregulation (e1RM from AMRAP/Joker sets). Syncs completed sessions to Hevy. See `README.md`, `plan.md` and `docs/rackbook-context.md`.
-- **Stack:** Python, FastAPI, stdlib `sqlite3` (no ORM), single-file vanilla-JS frontend (`index.html`)
+Rackbook: a personal workout logger and strength tracker (FastAPI) that plans set weights from an RPE table, saves finished workouts to Hevy, keeps its own record of every set, and builds RPE tables for squat/bench/deadlift from the user's own sets. It is no longer a 5/3/1-specific app; the 5/3/1 planner survives at `/legacy` only.
+**Start with `docs/rackbook-context.md`** (architecture, domain terms, decisions, constraints), then `docs/backlog.md` (what is done, what is next). `README.md` is the overview; `plan.md` is only a history log of the original build.
+- **Stack:** Python, FastAPI, stdlib `sqlite3` (no ORM), vanilla-JS frontend, one self-contained HTML file per page (`log.html` is the main one; no bundler)
 - **DB:** path from `DB_PATH` env var; `/data/rackbook.db` in Docker
-- **Tests:** `python -m unittest discover -s tests -t .` (pytest is not installed). `test_session_route.py` pins current session/e1RM behaviour; `expectedFailure` tests there mark known bugs
-- **Infra:** Docker container on Ubuntu homelab (CasaOS), port 8126.
+- **Tests:** `python -m unittest discover -s tests -t .` (pytest is not installed). `test_session_route.py` pins the legacy session/e1RM behaviour; `expectedFailure` tests there mark known bugs
+- **Infra:** Docker container on Ubuntu homelab (CasaOS), port 8126, reached over Tailscale (`tailscale serve`). No login: it can write permanent workouts to the user's Hevy account, so never post to the real Hevy account from tests or experiments
+- **Dev server:** `rackbook-dev` in `.claude/launch.json` (port 8127, local `rackbook.db`). Remove any test rows you add (ids starting `ZZ-`) afterwards
 - **Copilot:** Handles routine coding tasks — defer boilerplate and implementation detail to it
+
+## Current state (2026-10-16)
+
+- **Log page (`/log`)** is the product: RPE-planned weights from an e1RM or TM base per movement, the **TS** (a marked set that pins the movement's e1RM and sets its TM when the workout is saved), LSe1RM, kg/lb, Previous column, per-set e1RM, plate loader, per-exercise rest timer, drag to reorder, warm-ups not copied from past workouts and dropped when ticked.
+- **Local set record** (`logged_sets`): every saved set with its exact RPE (Hevy drops RPE below 6 / 6.5). Anything read back from Hevy (Previous column, last-session e1RM, Progress) misses those RPEs; fixing that is in the backlog.
+- **RPE tables** (`/rpe-charts`, `rpe_observed.py`): per lift, cells from the user's own sets, each workout with its own fitted e1RM, the TS counted as ordinary data, estimated cells only after a data gate (15 sets, 3 workouts, 4 reps of effort), nothing ever filled in from the table in use. Read-only; per-lift editable charts are next.
+- **Do not undo without asking:** the TS pins the e1RM; measuring sets against the TS's e1RM was rejected as circular; estimates only from the user's data; warm-ups are not kept.
+- The user works one feature at a time and checks it on his phone. Don't change behaviour he didn't ask about; hide things rather than delete; if a design has a real tradeoff, ask one question.
 
 ---
 
