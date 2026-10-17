@@ -415,6 +415,11 @@
     .wo-sheet-option { padding: 14px 16px; border-bottom: 0.5px solid var(--border); cursor: pointer; font-size: 15px; display: flex; align-items: center; gap: 12px; }
     .wo-sheet-option:last-child { border-bottom: none; }
     .wo-card-input { border: 1px solid var(--border); border-radius: 6px; background: var(--bg-elev); color: var(--text); padding: 2px 4px; }
+
+    .page-heading { display:flex; align-items:center; gap:8px; min-width:0; }
+    .page-back { flex-shrink:0; min-height:44px; padding:4px 8px; border:0; border-radius:8px; background:transparent; color:var(--accent,currentColor); font:inherit; font-size:14px; cursor:pointer; white-space:nowrap; }
+    .page-back:disabled { opacity:.4; cursor:default; }
+    .page-back:focus-visible { outline:2px solid var(--accent,currentColor); outline-offset:2px; }
   </style>
 </head>
 <body>
@@ -422,7 +427,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="dot" aria-hidden="true"></span>
-        <h1>Rackbook</h1>
+        <div class="page-heading"><button id="pageBack" class="page-back" type="button" aria-label="Go back">← Back</button><h1>Rackbook</h1></div>
       </div>
       <div class="theme-wrap">
         <span>Theme</span>
@@ -1888,5 +1893,18 @@ Lying Leg Curl - 5x10</pre>
 
     init();
   </script>
+
+<script id="page-navigation">
+  (() => {
+    const back=document.getElementById("pageBack");
+    let hasPrevious=false;
+    try { hasPrevious=history.length>1 && new URL(document.referrer).origin===location.origin; } catch (_) {}
+    back.disabled=!hasPrevious && (location.pathname==="/log" || location.pathname==="/");
+    back.addEventListener("click", () => {
+      if(hasPrevious)history.back();
+      else location.assign("/log");
+    });
+  })();
+</script>
 </body>
 </html>

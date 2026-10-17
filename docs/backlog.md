@@ -30,6 +30,8 @@ The gym is the garage on the home network, so none of this blocks use there.
 
 ## Done recently
 
+- Historical session window on the stress chart (2026-10-17): shaded 80–120% total-stress bands use each workout's earlier-only baseline, with red total points above usual and hollow points below. Missing baselines break the band; a single known range is still shown. All six app pages now have a Back button: same-origin browser history when available, otherwise the workout log; Back is disabled on a directly opened root/log page with no prior app page.
+
 - Stress dashboard (2026-10-17), `/stress`: main squat/bench/deadlift overview plus a selector for any cached movement; saved-session total/peripheral/central history, current session window, rolling 7/28-day totals, estimate coverage and history ranges (8 weeks, 6 months, one year, all). Historical windows use only sessions before the assessed workout. Scores are recalculated retroactively from Hevy plus exact local snapshots, with blank RPE estimated @5, no backfill or changes to saved workouts. The workout log stays compact. Draft sets are only included on `/log`, not in the saved-history dashboard.
 
 - Compact movement stress (2026-10-17): the card now shows only session stress and its session window/comparison. Rolling totals and supporting details remain calculated but hidden. Loading and retry states remain visible. Development guidance now assigns design, implementation, and validation directly to the coding assistant.

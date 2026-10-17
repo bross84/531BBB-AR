@@ -157,6 +157,10 @@ The `/stress` dashboard opens with the main three movements and a selector for a
 
 ## Database schema
 
+UI navigation: all six app pages have a Back button. It uses browser history only when the referring page is from the same origin and there is a prior entry; directly opened secondary pages fall back to `/log`. On a directly opened root/log page with no prior app page, Back is disabled. Navigation preserves the existing locally saved workout draft.
+
+The stress chart shades each session's historical lower/upper total-stress window. Missing baselines break the shaded band; isolated known windows remain visible. Total points above the range are red and points below are hollow, drawn above the component curves. Axis bounds include the upper window, so a low-work session cannot clip its reference range. The history table retains exact values and provisional labels.
+
 Foreign keys are enforced (`PRAGMA foreign_keys = ON` in `get_db()`). Always verify columns with `PRAGMA table_info`; `database.py` is the full DDL, and columns added later are `ALTER TABLE`s in `init_db()`.
 
 ### Tables the current app uses

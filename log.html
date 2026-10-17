@@ -188,12 +188,17 @@
     body.typing .bar { display: none; }
     body.typing main { padding-bottom: 60vh; }
     [hidden] { display: none !important; }
+
+    .page-heading { display:flex; align-items:center; gap:8px; min-width:0; }
+    .page-back { flex-shrink:0; min-height:44px; padding:4px 8px; border:0; border-radius:8px; background:transparent; color:var(--accent,currentColor); font:inherit; font-size:14px; cursor:pointer; white-space:nowrap; }
+    .page-back:disabled { opacity:.4; cursor:default; }
+    .page-back:focus-visible { outline:2px solid var(--accent,currentColor); outline-offset:2px; }
   </style>
 </head>
 <body>
 <main>
   <header>
-    <h1>Log workout</h1>
+    <div class="page-heading"><button id="pageBack" class="page-back" type="button" aria-label="Go back">← Back</button><h1>Log workout</h1></div>
     <span class="hright">
       <span class="units" role="group" aria-label="Weight unit"><button id="unitKg" type="button">kg</button><button id="unitLb" type="button">lb</button></span>
       <a href="/recent">Recent</a>
@@ -1462,6 +1467,19 @@
       draft.exercises.forEach(loadState);
     } else { draft = null; renderStart(); }
   });
+</script>
+
+<script id="page-navigation">
+  (() => {
+    const back=document.getElementById("pageBack");
+    let hasPrevious=false;
+    try { hasPrevious=history.length>1 && new URL(document.referrer).origin===location.origin; } catch (_) {}
+    back.disabled=!hasPrevious && (location.pathname==="/log" || location.pathname==="/");
+    back.addEventListener("click", () => {
+      if(hasPrevious)history.back();
+      else location.assign("/log");
+    });
+  })();
 </script>
 </body>
 </html>

@@ -54,12 +54,17 @@
     .legend { display: flex; gap: 14px; font-size: 13px; color: var(--muted); margin: 2px 0 6px; }
     .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; }
     @media (min-width: 900px) { main { max-width: 1000px; } }
+
+    .page-heading { display:flex; align-items:center; gap:8px; min-width:0; }
+    .page-back { flex-shrink:0; min-height:44px; padding:4px 8px; border:0; border-radius:8px; background:transparent; color:var(--accent,currentColor); font:inherit; font-size:14px; cursor:pointer; white-space:nowrap; }
+    .page-back:disabled { opacity:.4; cursor:default; }
+    .page-back:focus-visible { outline:2px solid var(--accent,currentColor); outline-offset:2px; }
   </style>
 </head>
 <body>
 <main>
   <header>
-    <h1>Progress</h1>
+    <div class="page-heading"><button id="pageBack" class="page-back" type="button" aria-label="Go back">← Back</button><h1>Progress</h1></div>
     <span><a href="/stress" style="margin-right:12px">Stress</a><a href="/rpe-charts" style="margin-right:12px">RPE tables</a><a href="/log">Log workout</a></span>
   </header>
   <div id="status"></div>
@@ -256,6 +261,19 @@
 
   // Refresh the stored weigh-ins from Hevy first (read-only), then draw. A failed sync still draws what is stored.
   fetch("/body-weight/sync", { method: "POST" }).catch(() => {}).then(load);
+</script>
+
+<script id="page-navigation">
+  (() => {
+    const back=document.getElementById("pageBack");
+    let hasPrevious=false;
+    try { hasPrevious=history.length>1 && new URL(document.referrer).origin===location.origin; } catch (_) {}
+    back.disabled=!hasPrevious && (location.pathname==="/log" || location.pathname==="/");
+    back.addEventListener("click", () => {
+      if(hasPrevious)history.back();
+      else location.assign("/log");
+    });
+  })();
 </script>
 </body>
 </html>

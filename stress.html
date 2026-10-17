@@ -30,6 +30,7 @@
     .metric small { display:block; font-size:12px; }
     .legend { display:flex; gap:14px; flex-wrap:wrap; font-size:13px; margin:8px 0; } .legend span:before { content:""; display:inline-block; width:12px; height:3px; vertical-align:middle; margin-right:6px; background:var(--accent); }
     .legend .ps:before { background:var(--peripheral); } .legend .cs:before { background:var(--central); }
+    .legend .window:before { height:10px; background:var(--accent); opacity:.25; border:1px dashed currentColor; }
     svg { width:100%; height:auto; display:block; } svg text { fill:var(--muted); font:12px system-ui,sans-serif; }
     .table-scroll { overflow-x:auto; } table { width:100%; border-collapse:collapse; font-size:13px; font-variant-numeric:tabular-nums; }
     th,td { text-align:right; padding:10px 8px; border-bottom:1px solid var(--line); white-space:nowrap; }
@@ -37,11 +38,16 @@
     td small { display:block; white-space:normal; min-width:120px; max-width:220px; } caption { text-align:left; font-size:13px; color:var(--muted); margin-bottom:8px; }
     .error { color:var(--error); } summary { cursor:pointer; min-height:44px; padding:10px 0; } #detail[aria-busy="true"] { opacity:.6; }
     @media(max-width:620px) { .overview { grid-template-columns:1fr; gap:8px; } .movement-card { padding:10px 12px; } .movement-card .card-score { font-size:20px; } .metrics { gap:6px; } .metric strong { font-size:22px; } .card { padding:12px; } }
+
+    .page-heading { display:flex; align-items:center; gap:8px; min-width:0; }
+    .page-back { flex-shrink:0; min-height:44px; padding:4px 8px; border:0; border-radius:8px; background:transparent; color:var(--accent,currentColor); font:inherit; font-size:14px; cursor:pointer; white-space:nowrap; }
+    .page-back:disabled { opacity:.4; cursor:default; }
+    .page-back:focus-visible { outline:2px solid var(--accent,currentColor); outline-offset:2px; }
   </style>
 </head>
 <body>
 <main>
-  <header><h1>Movement stress</h1><nav aria-label="Pages"><a href="/log">Log workout</a><a href="/progress">Progress</a><a href="/rpe-charts">RPE tables</a></nav></header>
+  <header><div class="page-heading"><button id="pageBack" class="page-back" type="button" aria-label="Go back">← Back</button><h1>Movement stress</h1></div><nav aria-label="Pages"><a href="/log">Log workout</a><a href="/progress">Progress</a><a href="/rpe-charts">RPE tables</a></nav></header>
   <p class="note intro">Training dose by movement, recalculated from your saved workouts. Older blank RPEs are estimated @5; exact local RPEs take precedence.</p>
   <div class="controls">
     <label>Movement <select id="movement" aria-label="Movement"><option value="">Loading movements…</option></select></label>
@@ -94,16 +100,36 @@
   }
   function svgNode(tag, attrs, text) { const n=document.createElementNS(NS,tag); for(const [k,v] of Object.entries(attrs))n.setAttribute(k,v); if(text!=null)n.textContent=text; return n; }
   function chart(rows) {
-    const svg=svgNode("svg",{viewBox:"0 0 800 250",role:"img","aria-label":"Session total, peripheral and central stress over calendar time"});
-    svg.append(svgNode("title",{},"Session stress over time. Exact values are in the history table."));
+    const svg=svgNode("svg",{viewBox:"0 0 800 250",role:"img","aria-label":"Session stress over time with shaded historical usual total-stress window"});
+    svg.append(svgNode("title",{},"Session stress and the usual total-stress window calculated before each workout. Exact values are in the history table."));
     const usable=rows.filter(r=>r.score.sets); if(!usable.length)return el("p","note","No scored sessions in this range.");
     const times=usable.map(r=>Date.parse(r.start_time)), first=Math.min(...times), last=Math.max(...times);
-    const max=Math.max(1,...usable.flatMap(r=>[r.score.total,r.score.peripheral,r.score.central]));
+    const hasWindow=(r)=>Number.isFinite(r.window?.lower)&&Number.isFinite(r.window?.upper);
+    const max=Math.max(1,...usable.flatMap(r=>[r.score.total,r.score.peripheral,r.score.central,...(hasWindow(r)?[r.window.upper]:[])]));
     const x=(t)=>first===last?420:48+(t-first)/(last-first)*724, y=(v)=>210-v/max*185;
     for(let i=0;i<=4;i++) { const value=max*i/4, yy=y(value); svg.append(svgNode("line",{x1:48,x2:772,y1:yy,y2:yy,stroke:"var(--line)"}),svgNode("text",{x:40,y:yy+4,"text-anchor":"end"},value.toFixed(1))); }
-    for(const [metric,color] of [["total","var(--accent)"],["peripheral","var(--peripheral)"],["central","var(--central)"]]) {
+    // Split at missing baselines: never bridge a period with no known usual range.
+    let band=[];
+    function drawBand() {
+      if(!band.length)return;
+      if(band.length===1) {
+        const r=band[0]; svg.append(svgNode("rect",{x:x(Date.parse(r.start_time))-6,y:y(r.window.upper),width:12,height:y(r.window.lower)-y(r.window.upper),fill:"var(--accent)",opacity:.14}));
+      } else {
+        const upper=band.map(r=>x(Date.parse(r.start_time))+","+y(r.window.upper));
+        const lower=band.map(r=>x(Date.parse(r.start_time))+","+y(r.window.lower));
+        svg.append(svgNode("polygon",{points:[...upper,...[...lower].reverse()].join(" "),fill:"var(--accent)",opacity:.14}));
+        for(const points of [upper,lower])svg.append(svgNode("polyline",{points:points.join(" "),fill:"none",stroke:"var(--accent)","stroke-opacity":.45,"stroke-dasharray":"4 4","stroke-width":1}));
+      }
+      band=[];
+    }
+    for(const r of usable) { if(hasWindow(r))band.push(r);else drawBand(); } drawBand();
+    for(const [metric,color] of [["peripheral","var(--peripheral)"],["central","var(--central)"],["total","var(--accent)"]]) {
       svg.append(svgNode("polyline",{points:usable.map(r=>x(Date.parse(r.start_time))+","+y(r.score[metric])).join(" "),fill:"none",stroke:color,"stroke-width":2}));
-      for(const r of usable) { const dot=svgNode("circle",{cx:x(Date.parse(r.start_time)),cy:y(r.score[metric]),r:3,fill:color}); dot.append(svgNode("title",{},date(r.start_time)+" · "+metric+" "+fmt(r.score[metric]))); svg.append(dot); }
+      for(const r of usable) {
+        const compared=metric==="total"&&hasWindow(r), above=compared&&r.score.total>r.window.upper, below=compared&&r.score.total<r.window.lower;
+        const dot=svgNode("circle",{cx:x(Date.parse(r.start_time)),cy:y(r.score[metric]),r:above||below?4.5:3,fill:above?"var(--error)":below?"var(--card)":color,stroke:above?"var(--error)":color,"stroke-width":above||below?2:0});
+        dot.append(svgNode("title",{},date(r.start_time)+" · "+metric+" "+fmt(r.score[metric])+(compared?" · Usual "+windowText(r.window)+" · "+(above?"Above usual":below?"Below usual":"Within usual"):""))); svg.append(dot);
+      }
     }
     svg.append(svgNode("text",{x:48,y:239},date(usable[0].start_time)),svgNode("text",{x:772,y:239,"text-anchor":"end"},date(usable.at(-1).start_time)));
     return svg;
@@ -125,8 +151,8 @@
     if(latest)top.append(el("p","note","Latest session · "+date(latest.start_time)));
     box.append(top);
     const plot=el("section","card"); plot.append(el("h3",null,"Session stress history"));
-    const legend=el("div","legend"); for(const [label,cls] of [["Total",""],["Peripheral","ps"],["Central","cs"]])legend.append(el("span",cls,label));
-    plot.append(legend,chart(data.sessions)); box.append(plot);
+    const legend=el("div","legend"); for(const [label,cls] of [["Total",""],["Peripheral","ps"],["Central","cs"],["Usual total-stress window","window"]])legend.append(el("span",cls,label));
+    plot.append(legend,chart(data.sessions),el("p","note","Shading is the session window known before each workout. Red total-stress points are above usual; hollow points are below. No shading means there was no baseline yet.")); box.append(plot);
     const history=el("section","card"); history.append(el("h3",null,"Saved sessions"));
     history.append(el("p","note",data.sessions.length+" shown / "+data.available_sessions+" available"+(data.first_recorded_at?" · History starts "+date(data.first_recorded_at):"")));
     if(!data.sessions.length) { history.append(el("p","note","No saved sessions in this period. Choose a longer history range.")); box.append(history); return; }
@@ -174,6 +200,19 @@
   $("range").addEventListener("change",()=>{loadOverview();selectMovement(selected);});
   $("refresh").addEventListener("click",()=>{if(!movements.length){init();return;} results.clear(); loadOverview(); selectMovement(selected);});
   init();
+</script>
+
+<script id="page-navigation">
+  (() => {
+    const back=document.getElementById("pageBack");
+    let hasPrevious=false;
+    try { hasPrevious=history.length>1 && new URL(document.referrer).origin===location.origin; } catch (_) {}
+    back.disabled=!hasPrevious && (location.pathname==="/log" || location.pathname==="/");
+    back.addEventListener("click", () => {
+      if(hasPrevious)history.back();
+      else location.assign("/log");
+    });
+  })();
 </script>
 </body>
 </html>
